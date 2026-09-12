@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en-NG">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=5"
+    />
+    <meta name="theme-color" content="#0f3a5a" />
+    <meta name="color-scheme" content="light" />
+    <meta
+      name="description"
+      content="Offline-first community health outreach management for the Nichodemus Ugbor Memorial Community Health Outreach. All data is stored on the device."
+    />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="NUG Outreach" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" href="./favicon.ico" sizes="any" />
+    <link rel="icon" type="image/png" href="./icons/favicon-32.png" sizes="32x32" />
+    <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
+    <title>Nichodemus Ugbor Memorial Community Health Outreach</title>
+    <style>
+      /* Shown until the React bundle takes over. */
+      #boot {
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #0f3a5a;
+        color: #fff;
+        font: 16px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+        text-align: center;
+        padding: 24px;
+      }
+      #boot p { max-width: 340px; line-height: 1.5; opacity: 0.9; margin: 16px auto 0; }
+      #boot img { border-radius: 50%; background: #fff; }
+    </style>
+  </head>
+  <body>
+    <div id="root">
+      <div id="boot">
+        <div>
+          <img src="./icons/logo-circle.png" alt="" width="132" height="132" />
+          <p>
+            <strong>Nichodemus Ugbor Memorial<br />Community Health Outreach</strong><br /><br />
+            Starting the application…
+          </p>
+        </div>
+      </div>
+    </div>
+    <noscript>
+      <div style="padding: 24px; font-family: system-ui, sans-serif">
+        This application needs JavaScript in order to run. It still does not need an internet
+        connection.
+      </div>
+    </noscript>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

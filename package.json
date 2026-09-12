@@ -1,0 +1,100 @@
+{
+  "name": "nug-outreach",
+  "productName": "Nichodemus Ugbor Memorial Community Health Outreach",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Offline-first, local-database community health outreach management system.",
+  "type": "module",
+  "scripts": {
+    "predev": "node scripts/copy-wasm.mjs && node scripts/make-brand.mjs",
+    "dev": "vite",
+    "prebuild": "node scripts/copy-wasm.mjs && node scripts/make-brand.mjs",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --port 4173",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "apk": "node scripts/build-apk.mjs",
+    "serve": "node scripts/serve-lan.mjs",
+    "brand": "node scripts/make-brand.mjs",
+    "desktop": "npm run build && node scripts/run-desktop.mjs",
+    "desktop:build": "npm run build && electron-builder --publish never",
+    "cloud:setup": "node scripts/cloud-setup.mjs",
+    "cloud:deploy": "vercel deploy --prod",
+    "cloud:verify": "node scripts/cloud-verify.mjs"
+  },
+  "dependencies": {
+    "@capacitor/core": "^8.5.2",
+    "@capacitor/filesystem": "^8.1.3",
+    "@capacitor/share": "^8.0.1",
+    "@libsql/client": "^0.18.0",
+    "jspdf": "^2.5.2",
+    "jspdf-autotable": "^3.8.4",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "sql.js": "^1.12.0"
+  },
+  "devDependencies": {
+    "@capacitor/android": "^8.5.2",
+    "@capacitor/cli": "^8.5.2",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@types/sql.js": "^1.4.9",
+    "@vitejs/plugin-react": "^4.3.4",
+    "electron": "^44.3.0",
+    "electron-builder": "^26.15.3",
+    "fake-indexeddb": "^6.0.0",
+    "sharp": "^0.35.4",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.11",
+    "vitest": "^2.1.8"
+  },
+  "main": "electron/main.cjs",
+  "build": {
+    "appId": "org.nugoutreach.desktop",
+    "productName": "NUG Outreach",
+    "copyright": "Nichodemus Ugbor Memorial Community Health Outreach",
+    "directories": {
+      "output": "release/desktop",
+      "buildResources": "build/electron"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/electron/icon.ico",
+      "artifactName": "NUG-Outreach-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "NUG Outreach"
+    },
+    "mac": {
+      "target": [
+        "dmg"
+      ],
+      "icon": "build/electron/icon.png",
+      "category": "public.app-category.medical"
+    },
+    "linux": {
+      "target": [
+        "AppImage"
+      ],
+      "icon": "build/electron/icon.png",
+      "category": "Office"
+    }
+  }
+}
