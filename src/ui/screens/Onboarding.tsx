@@ -15,14 +15,27 @@ import {
 } from '../components/ui'
 import { APP_NAME } from '../../core/constants'
 import { SETTING_KEYS } from '../../core/constants'
-import { createProject, setActiveProject } from '../../db/repo/projects'
+import {
+  activeProject,
+  createProject,
+  listProjects,
+  setActiveProject,
+} from '../../db/repo/projects'
 import { saveFacility } from '../../db/repo/referrals'
-import { createUser, login, verifyUserPin, changePin, listUsers } from '../../db/repo/users'
+import {
+  changePin,
+  createUser,
+  hasAdministrator,
+  listUsers,
+  login,
+  verifyUserPin,
+} from '../../db/repo/users'
 import { ROLES } from '../../core/permissions'
 import { setSetting } from '../../db/repo/settings'
 import { validatePin, validatePassphrase, firstError, required } from '../../core/validation'
 import { transaction, flush } from '../../db/sqlite'
 import { restoreBackup } from '../../services/backup'
+import { runSync, saveSyncConfig } from '../../services/sync'
 import { pickFile } from '../../services/fileIo'
 import { setAuditActor } from '../../core/audit'
 import { migrate } from '../../db/migrations'
@@ -34,7 +47,7 @@ const STEP_COUNT = 6
 export function SetupWizard() {
   const { completeSetup } = useApp()
   const toast = useToast()
-  const [mode, setMode] = useState<'CHOOSE' | 'CREATE' | 'RESTORE'>('CHOOSE')
+  const [mode, setMode] = useState<'CHOOSE' | 'CREATE' | 'JOIN' | 'RESTORE'>('CHOOSE')
   const [step, setStep] = useState(0)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -75,6 +88,12 @@ export function SetupWizard() {
   const [facilityPhone, setFacilityPhone] = useState('')
 
   const [loadDemo, setLoadDemo] = useState(false)
+
+  // Joining an outreach that already exists elsewhere
+  const [joinEndpoint, setJoinEndpoint] = useState('')
+  const [joinToken, setJoinToken] = useState('')
+  const [joinBlock, setJoinBlock] = useState('1')
+  const [joinProgress, setJoinProgress] = useState('')
 
   function validateStep(): string | null {
     if (step === 0) {
@@ -152,6 +171,72 @@ export function SetupWizard() {
     }
   }
 
+  /**
+   * Brings this device into an outreach that is already running elsewhere.
+   *
+   * Without this a second device is stuck: cloud sync lives behind the
+   * sign-in screen, but the user accounts it would sign in with exist only
+   * in the cloud. The only alternatives were to create a duplicate project
+   * or to carry a backup file around by hand.
+   */
+  async function doJoin() {
+    setBusy(true)
+    setError(null)
+    setJoinProgress('Saving the cloud settings…')
+    try {
+      const block = Number(joinBlock)
+      if (!Number.isInteger(block) || block < 0) {
+        setError('The device number must be a whole number, 0 or greater.')
+        return
+      }
+
+      await transaction(() => {
+        saveSyncConfig({
+          endpoint: joinEndpoint.trim(),
+          token: joinToken.trim(),
+          serialBlock: block,
+          enabled: true,
+          cursor: 0,
+        })
+      })
+
+      setJoinProgress('Downloading the outreach…')
+      const result = await runSync()
+
+      if (listProjects().length === 0) {
+        setError(
+          'Connected successfully, but the cloud has no outreach in it yet. ' +
+            'Set the outreach up on the first device and synchronise it, then join from here.',
+        )
+        return
+      }
+      if (!hasAdministrator()) {
+        setError(
+          'The outreach arrived but no user accounts came with it, so there would be no way ' +
+            'to sign in. Synchronise the first device again, then try joining.',
+        )
+        return
+      }
+
+      const project = activeProject()
+      await transaction(() => {
+        if (project) setActiveProject(project.id)
+        setSetting(SETTING_KEYS.SESSION_TIMEOUT_MINUTES, timeout)
+        setSetting(SETTING_KEYS.BACKUP_REMINDER_HOURS, backupReminder)
+        setSetting(SETTING_KEYS.SETUP_COMPLETE, 'true')
+      })
+      await flush()
+
+      toast('ok', `Joined the outreach. ${result.pulled} records received.`)
+      completeSetup()
+    } catch (err) {
+      setError(friendlyError(err, 'This device could not join the outreach.'))
+    } finally {
+      setJoinProgress('')
+      setBusy(false)
+    }
+  }
+
   async function doRestore() {
     setBusy(true)
     setError(null)
@@ -204,6 +289,14 @@ export function SetupWizard() {
             Create new project
           </button>
           <div style={{ height: 10 }} />
+          <button className="btn block secondary" onClick={() => setMode('JOIN')}>
+            Join an existing outreach
+          </button>
+          <p className="hint" style={{ marginTop: 6 }}>
+            For a second phone, a laptop, or this web address — takes the project, the team and the
+            records from the outreach that is already set up.
+          </p>
+          <div style={{ height: 10 }} />
           <button className="btn block secondary" onClick={() => setMode('RESTORE')}>
             Restore existing backup
           </button>
@@ -214,6 +307,71 @@ export function SetupWizard() {
               </AlertBox>
             </div>
           ) : null}
+        </div>
+      </div>
+    )
+  }
+
+  if (mode === 'JOIN') {
+    return (
+      <div className="centre-screen">
+        <div className="brand">
+          <Logo size={104} className="brand-seal" />
+          <h1>Join an existing outreach</h1>
+          <p>This device will download the outreach that is already set up.</p>
+        </div>
+        <div className="panel">
+          <AlertBox tone="info" title="You will need three things">
+            The web address of the outreach, its device key, and a device number that no other
+            device is using. The project administrator has all three.
+          </AlertBox>
+
+          <TextField
+            label="Web address"
+            value={joinEndpoint}
+            onChange={setJoinEndpoint}
+            placeholder="https://nichodemus.vercel.app"
+            required
+          />
+          <TextField
+            label="Device key"
+            value={joinToken}
+            onChange={setJoinToken}
+            type="password"
+            required
+            help="The same key every device on this outreach uses."
+          />
+          <NumberField
+            label="Device number"
+            value={joinBlock}
+            onChange={setJoinBlock}
+            required
+            help="Must differ from every other device. The first device is 0, so give this one 1, the next 2, and so on. Two devices sharing a number would give the same participant number to different people."
+          />
+
+          {joinProgress ? <p className="hint">{joinProgress}</p> : null}
+          {error ? (
+            <AlertBox tone="danger" title="Could not join">
+              {error}
+            </AlertBox>
+          ) : null}
+
+          <button
+            className="btn block large"
+            onClick={doJoin}
+            disabled={busy || !joinEndpoint.trim() || !joinToken.trim()}
+          >
+            {busy ? 'Joining…' : 'Join outreach'}
+          </button>
+          <div style={{ height: 10 }} />
+          <button className="btn block ghost" onClick={() => setMode('CHOOSE')} disabled={busy}>
+            Back
+          </button>
+
+          <p className="hint">
+            This needs a connection once. Afterwards the device works offline exactly like every
+            other, and synchronises again whenever there is a signal.
+          </p>
         </div>
       </div>
     )
