@@ -64,7 +64,7 @@ describe.skipIf(!LIVE)('the live cloud database', () => {
     const url = process.env.TURSO_DATABASE_URL
     if (!url) throw new Error('TURSO_DATABASE_URL is not set')
     client = createClient({ url, authToken: process.env.TURSO_AUTH_TOKEN })
-    handler = (await import('../api/sync')).default
+    handler = (await import('../api/sync')).webHandler
 
     const ping = await (await post({ action: 'ping', deviceId: 'verify' })).json()
     startCursor = Number(ping.cursor ?? 0)

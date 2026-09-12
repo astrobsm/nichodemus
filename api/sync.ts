@@ -35,13 +35,6 @@ function db(): Client {
   return client
 }
 
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'content-type': 'application/json' },
-  })
-}
-
 /** Columns the cloud copy of a table actually has. */
 const columnCache = new Map<string, Set<string>>()
 async function columnsOf(table: string): Promise<Set<string>> {
@@ -111,20 +104,35 @@ async function upsert(record: SyncRecord, deviceId: string): Promise<'accepted' 
 
   return 'accepted'
 }
+/**
+ * The endpoint's logic, independent of how the request arrived.
+ *
+ * Vercel's Node runtime hands functions a Node request/response pair, while
+ * tests (and any edge runtime) speak the web Request/Response standard.
+ * Keeping the logic free of either means both adapters below are trivial and
+ * the behaviour they share is tested once.
+ */
+export async function handleSync(input: {
+  method: string
+  token: string | null
+  body: unknown
+}): Promise<{ status: number; body: unknown }> {
+  const json = (body: unknown, status = 200) => ({ status, body })
 
-export default async function handler(request: Request): Promise<Response> {
-  if (request.method !== 'POST') return json({ ok: false, error: 'Use POST.' }, 405)
+  if (input.method !== 'POST') return json({ ok: false, error: 'Use POST.' }, 405)
 
   const expected = process.env.SYNC_TOKEN
   if (!expected) return json({ ok: false, error: 'The server has no SYNC_TOKEN configured.' }, 500)
-  if (request.headers.get('x-sync-token') !== expected) {
-    return json({ ok: false, error: 'Unauthorised device.' }, 401)
-  }
+  if (input.token !== expected) return json({ ok: false, error: 'Unauthorised device.' }, 401)
 
-  let body: { action?: string; deviceId?: string; records?: SyncRecord[]; cursor?: number; limit?: number }
-  try {
-    body = await request.json()
-  } catch {
+  const body = input.body as {
+    action?: string
+    deviceId?: string
+    records?: SyncRecord[]
+    cursor?: number
+    limit?: number
+  }
+  if (!body || typeof body !== 'object') {
     return json({ ok: false, error: 'Malformed request.' }, 400)
   }
 
@@ -206,4 +214,95 @@ export default async function handler(request: Request): Promise<Response> {
     console.error('[sync]', err)
     return json({ ok: false, error: 'The cloud could not complete the request.' }, 500)
   }
+}
+
+
+// --------------------------------------------------------------- adapters
+
+/** Web-standard adapter, used by the tests and by any edge runtime. */
+export async function webHandler(request: Request): Promise<Response> {
+  let parsed: unknown = null
+  if (request.method === 'POST') {
+    try {
+      parsed = await request.json()
+    } catch {
+      return new Response(JSON.stringify({ ok: false, error: 'Malformed request.' }), {
+        status: 400,
+        headers: { 'content-type': 'application/json' },
+      })
+    }
+  }
+  const result = await handleSync({
+    method: request.method,
+    token: request.headers.get('x-sync-token'),
+    body: parsed,
+  })
+  return new Response(JSON.stringify(result.body), {
+    status: result.status,
+    headers: { 'content-type': 'application/json' },
+  })
+}
+
+interface NodeRequest {
+  method?: string
+  headers: Record<string, string | string[] | undefined>
+  body?: unknown
+  on(event: string, listener: (chunk?: unknown) => void): void
+}
+
+interface NodeResponse {
+  statusCode: number
+  setHeader(name: string, value: string): void
+  end(body: string): void
+}
+
+/** Reads the body when the platform has not already parsed it. */
+function readBody(request: NodeRequest): Promise<unknown> {
+  if (request.body !== undefined && request.body !== null) {
+    if (typeof request.body === 'string') {
+      try {
+        return Promise.resolve(JSON.parse(request.body))
+      } catch {
+        return Promise.resolve(null)
+      }
+    }
+    return Promise.resolve(request.body)
+  }
+  // Nothing to stream from: resolve rather than wait for events that will
+  // never arrive. A serverless function that hangs burns its whole timeout
+  // and returns a gateway error instead of an answer.
+  if (typeof request.on !== 'function') return Promise.resolve(null)
+
+  return new Promise((resolve) => {
+    const chunks: Buffer[] = []
+    request.on('data', (chunk) => chunks.push(chunk as Buffer))
+    request.on('end', () => {
+      try {
+        resolve(JSON.parse(Buffer.concat(chunks).toString('utf8')))
+      } catch {
+        resolve(null)
+      }
+    })
+    request.on('error', () => resolve(null))
+  })
+}
+
+/** Default export: the shape Vercel's Node runtime calls. */
+export default async function handler(
+  request: NodeRequest,
+  response: NodeResponse,
+): Promise<void> {
+  const header = request.headers['x-sync-token']
+  const token = Array.isArray(header) ? (header[0] ?? null) : (header ?? null)
+  const method = request.method ?? 'GET'
+  const result = await handleSync({
+    method,
+    token,
+    // Only a POST carries a body. Reading one from a GET would wait on a
+    // stream that never ends.
+    body: method === 'POST' ? await readBody(request) : null,
+  })
+  response.statusCode = result.status
+  response.setHeader('content-type', 'application/json')
+  response.end(JSON.stringify(result.body))
 }

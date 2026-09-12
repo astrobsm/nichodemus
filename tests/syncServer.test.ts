@@ -88,7 +88,7 @@ beforeAll(async () => {
 
   // Imported after the environment is set: the module builds its client lazily
   // but reads the variables on first use.
-  handler = (await import('../api/sync')).default
+  handler = (await import('../api/sync')).webHandler
 })
 
 afterAll(() => {
@@ -270,6 +270,109 @@ describe('pull', () => {
     ).json()
     expect(caughtUp.records).toHaveLength(0)
     expect(caughtUp.more).toBe(false)
+  })
+})
+
+describe('the Node adapter Vercel actually calls', () => {
+  /**
+   * Vercel's Node runtime passes a Node request/response pair, not a web
+   * Request. The deployed function failed on every call until this path
+   * existed, so it is tested directly rather than only through the web
+   * adapter the other tests use.
+   */
+  function nodeCall(
+    method: string,
+    token: string | null,
+    body: unknown,
+    { preparsed = true }: { preparsed?: boolean } = {},
+  ): Promise<{ status: number; body: any; contentType: string }> {
+    return new Promise(async (resolve) => {
+      const listeners: Record<string, ((chunk?: unknown) => void)[]> = {}
+      const request = {
+        method,
+        headers: token === null ? {} : { 'x-sync-token': token },
+        ...(preparsed ? { body } : {}),
+        on(event: string, listener: (chunk?: unknown) => void) {
+          ;(listeners[event] ??= []).push(listener)
+        },
+      }
+      const headers: Record<string, string> = {}
+      const response = {
+        statusCode: 0,
+        setHeader(name: string, value: string) {
+          headers[name] = value
+        },
+        end(payload: string) {
+          resolve({
+            status: response.statusCode,
+            body: JSON.parse(payload),
+            contentType: headers['content-type'],
+          })
+        },
+      }
+
+      const nodeHandler = (await import('../api/sync')).default
+      const done = nodeHandler(request as never, response as never)
+
+      if (!preparsed) {
+        // Stream the body the way an unparsed Node request would.
+        queueMicrotask(() => {
+          listeners.data?.forEach((l) => l(Buffer.from(JSON.stringify(body))))
+          listeners.end?.forEach((l) => l())
+        })
+      }
+      await done
+    })
+  }
+
+  it('answers a ping with a JSON body and the right status', async () => {
+    const res = await nodeCall('POST', TOKEN, { action: 'ping', deviceId: 'node-a' })
+    expect(res.status).toBe(200)
+    expect(res.contentType).toBe('application/json')
+    expect(res.body.ok).toBe(true)
+  })
+
+  it('refuses a wrong key', async () => {
+    const res = await nodeCall('POST', 'nope', { action: 'ping', deviceId: 'node-a' })
+    expect(res.status).toBe(401)
+  })
+
+  it('refuses a missing key', async () => {
+    const res = await nodeCall('POST', null, { action: 'ping', deviceId: 'node-a' })
+    expect(res.status).toBe(401)
+  })
+
+  it('refuses anything but POST', async () => {
+    const res = await nodeCall('GET', TOKEN, null)
+    expect(res.status).toBe(405)
+  })
+
+  it('reads a body the platform has not parsed', async () => {
+    const res = await nodeCall(
+      'POST',
+      TOKEN,
+      { action: 'ping', deviceId: 'node-stream' },
+      { preparsed: false },
+    )
+    expect(res.status).toBe(200)
+    expect(res.body.ok).toBe(true)
+  })
+
+  it('pushes and pulls through the Node path', async () => {
+    const push = await nodeCall('POST', TOKEN, {
+      action: 'push',
+      deviceId: 'node-writer',
+      records: [participantRecord('node-1')],
+    })
+    expect(push.body.accepted).toBe(1)
+
+    const pull = await nodeCall('POST', TOKEN, {
+      action: 'pull',
+      deviceId: 'node-reader',
+      cursor: 0,
+      limit: 200,
+    })
+    expect(pull.body.records.some((r: { uuid: string }) => r.uuid === 'node-1')).toBe(true)
   })
 })
 
