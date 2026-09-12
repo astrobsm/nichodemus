@@ -77,13 +77,9 @@ const head = execSync('git rev-parse HEAD', { cwd: root }).toString().trim().sli
 console.log(`    build ${build}`)
 if (build !== head) {
   console.error(
-    `
-The build identity (${build}) is not the current commit (${head}).
-` +
-      'Every copy compares itself against the deployment by this value, so a
-' +
-      'mismatch means permanent, useless update prompts. Stopping.
-',
+    `\nThe build identity (${build}) is not the current commit (${head}).\n` +
+      'Every copy compares itself against the deployment by this value, so a\n' +
+      'mismatch means permanent, useless update prompts. Stopping.\n',
   )
   process.exit(1)
 }
