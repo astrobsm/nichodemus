@@ -21,6 +21,7 @@ import {
   writeFileSync,
   readFileSync,
   readdirSync,
+  rmSync,
   statSync,
 } from 'node:fs'
 import { dirname, resolve, join } from 'node:path'
@@ -244,6 +245,13 @@ const env = {
 }
 
 // -------------------------------------------------------------- build
+
+// The published copy of the previous APK lives under public/, which vite
+// copies wholesale into dist, which Capacitor then packages. Left in place,
+// each release would ship the previous release inside itself and the file
+// would double in size every time.
+const publishedApk = resolve(root, 'public/download/nug-outreach.apk')
+if (existsSync(publishedApk)) rmSync(publishedApk)
 
 say('Building the web application')
 run('npm run build')
