@@ -35,6 +35,20 @@ export default function App() {
 }
 
 function Root() {
+  return (
+    <>
+      {/*
+        Above every phase, not only the signed-in shell. A device sitting at
+        the sign-in screen between outreaches is the one most likely to be
+        running old code, and it would never have been told.
+      */}
+      <UpdateBanner />
+      <Phase />
+    </>
+  )
+}
+
+function Phase() {
   const { phase, bootError, locked } = useApp()
 
   // Restore accessibility preferences before first paint of the shell.
@@ -123,8 +137,6 @@ function Shell() {
           ⏻
         </button>
       </header>
-
-      <UpdateBanner />
 
       {demoMode ? <div className="demo-ribbon">Demo data present — not real patient records</div> : null}
 
