@@ -90,6 +90,7 @@ function createWindow() {
 app.whenReady().then(() => {
   protocol.handle(SCHEME, (request) => net.fetch(pathToFileURL(resolveRequest(request.url)).toString()))
   createWindow()
+  configureUpdates()
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
@@ -98,6 +99,72 @@ app.whenReady().then(() => {
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()
+})
+
+// ------------------------------------------------------------- updating
+//
+// The desktop application keeps itself current: it asks the project's
+// releases whether a newer installer exists, downloads it in the background
+// and installs it when the application is next closed.
+//
+// It never installs while the application is open. Someone may be halfway
+// through a consultation, and a restart chosen by the software rather than
+// by the person using it is how a morning's records get lost.
+
+const { autoUpdater } = require('electron-updater')
+
+let updateReady = null
+
+function notifyRenderer(channel, payload) {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send(channel, payload)
+  }
+}
+
+function configureUpdates() {
+  // A development run has no packaged application to replace.
+  if (!app.isPackaged) return
+
+  autoUpdater.autoDownload = true
+  // The whole point is that the update is ready without anyone being asked
+  // to sit and wait for it; installing is still a deliberate act.
+  autoUpdater.autoInstallOnAppQuit = true
+  autoUpdater.logger = null
+
+  autoUpdater.on('update-downloaded', (info) => {
+    updateReady = info
+    notifyRenderer('nug:updateReady', { version: info?.version })
+  })
+
+  autoUpdater.on('error', () => {
+    // No releases published yet, or no connection. An update check that
+    // cannot reach anything must never interrupt the application.
+  })
+
+  // Once at startup, then daily for a machine that is left running.
+  const check = () => autoUpdater.checkForUpdates().catch(() => undefined)
+  setTimeout(check, 8000)
+  setInterval(check, 24 * 60 * 60 * 1000)
+}
+
+ipcMain.handle('nug:checkForUpdate', async () => {
+  if (!app.isPackaged) return { available: false, reason: 'development build' }
+  if (updateReady) return { available: true, version: updateReady.version, ready: true }
+  try {
+    const result = await autoUpdater.checkForUpdates()
+    const version = result?.updateInfo?.version
+    return { available: Boolean(version && version !== app.getVersion()), version }
+  } catch {
+    return { available: false, reason: 'unreachable' }
+  }
+})
+
+ipcMain.handle('nug:installUpdate', async () => {
+  if (!updateReady) return false
+  // isSilent false, isForceRunAfter true: the person sees the installer and
+  // the application comes back up when it is done.
+  setImmediate(() => autoUpdater.quitAndInstall(false, true))
+  return true
 })
 
 // ------------------------------------------------------------ file access

@@ -2,7 +2,9 @@
 
 export const APP_NAME = 'Nichodemus Ugbor Memorial Community Health Outreach'
 export const APP_SHORT_NAME = 'NUG Outreach'
-export const APP_VERSION = '1.0.0'
+// Generated from package.json at build time, so this can never disagree
+// with the version of the installer someone downloaded.
+export { APP_VERSION, APP_BUILD, BUILT_AT } from './buildInfo'
 
 export const PROJECT_STATUSES = [
   'PLANNING',

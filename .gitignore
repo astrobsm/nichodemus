@@ -14,4 +14,9 @@ android/
 .vercel
 
 .vercel
-.env*
+.env*
+
+# ...but .env holds only the public web address the packaged Android and
+# desktop builds point at. It is not a secret, and a checkout that lacks it
+# produces installers that cannot find the outreach.
+!.env

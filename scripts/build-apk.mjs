@@ -343,6 +343,13 @@ const name = `nug-outreach-${version}-${wantRelease ? 'release-unsigned' : 'debu
 const out = resolve(releaseDir, name)
 copyFileSync(built, out)
 
+// Also publish it at a stable address inside the web deployment, which is
+// where an installed phone looks when it finds it is out of date. Without
+// this the update banner on Android would point at nothing.
+const downloadDir = resolve(root, 'public/download')
+mkdirSync(downloadDir, { recursive: true })
+copyFileSync(built, resolve(downloadDir, 'nug-outreach.apk'))
+
 const sizeMb = (statSync(out).size / (1024 * 1024)).toFixed(1)
 
 say('Done')

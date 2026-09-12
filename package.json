@@ -8,8 +8,9 @@
   "scripts": {
     "predev": "node scripts/copy-wasm.mjs && node scripts/make-brand.mjs",
     "dev": "vite",
-    "prebuild": "node scripts/copy-wasm.mjs && node scripts/make-brand.mjs",
+    "prebuild": "node scripts/copy-wasm.mjs && node scripts/make-brand.mjs && node scripts/stamp-build.mjs",
     "build": "tsc --noEmit && vite build",
+    "postbuild": "node scripts/stamp-build.mjs post",
     "preview": "vite preview --port 4173",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -22,13 +23,15 @@
     "cloud:setup": "node scripts/cloud-setup.mjs",
     "cloud:deploy": "vercel deploy --prod",
     "cloud:verify": "node scripts/cloud-verify.mjs",
-    "build:ci": "node scripts/copy-wasm.mjs && tsc --noEmit && vite build"
+    "build:ci": "node scripts/copy-wasm.mjs && node scripts/stamp-build.mjs && tsc --noEmit && vite build && node scripts/stamp-build.mjs post",
+    "release": "node scripts/release.mjs"
   },
   "dependencies": {
     "@capacitor/core": "^8.5.2",
     "@capacitor/filesystem": "^8.1.3",
     "@capacitor/share": "^8.0.1",
     "@libsql/client": "^0.18.0",
+    "electron-updater": "^6.8.9",
     "jspdf": "^2.5.2",
     "jspdf-autotable": "^3.8.4",
     "react": "^18.3.1",
@@ -60,6 +63,13 @@
       "output": "release/desktop",
       "buildResources": "build/electron"
     },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "astrobsm",
+        "repo": "nichodemus"
+      }
+    ],
     "files": [
       "dist/**/*",
       "electron/**/*",

@@ -2,6 +2,7 @@
 import { useEffect } from 'react'
 import { AppProvider, useApp } from './ui/AppState'
 import { Logo, ToastProvider } from './ui/components/ui'
+import { UpdateBanner } from './ui/components/UpdateBanner'
 import { navigate, useRoute } from './ui/router'
 import { LockScreen, LoginScreen, SetupWizard } from './ui/screens/Onboarding'
 import { Dashboard } from './ui/screens/Dashboard'
@@ -122,6 +123,8 @@ function Shell() {
           ⏻
         </button>
       </header>
+
+      <UpdateBanner />
 
       {demoMode ? <div className="demo-ribbon">Demo data present — not real patient records</div> : null}
 

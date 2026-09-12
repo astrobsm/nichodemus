@@ -743,3 +743,47 @@ table.data td.num, table.data th.num { text-align: right; font-variant-numeric: 
   color: var(--muted);
   font-size: 12px;
 }
+
+/* ------------------------------------------------------------- updating */
+.update-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: #123f60;
+  color: #fff;
+  font-size: 13.5px;
+}
+.update-bar .glyph {
+  font-size: 18px;
+  opacity: 0.9;
+}
+.update-bar .grow {
+  flex: 1;
+  min-width: 0;
+}
+.update-title {
+  font-weight: 700;
+}
+.update-detail {
+  opacity: 0.85;
+  font-size: 12.5px;
+}
+.update-bar .btn.small {
+  background: #fff;
+  color: #123f60;
+  border-color: #fff;
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.update-dismiss {
+  background: none;
+  border: 0;
+  color: #fff;
+  opacity: 0.75;
+  font-size: 16px;
+  min-width: 44px;
+  min-height: 44px;
+  cursor: pointer;
+}

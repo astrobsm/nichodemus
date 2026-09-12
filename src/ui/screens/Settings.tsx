@@ -57,6 +57,7 @@ import {
   restoreBackup,
 } from '../../services/backup'
 import { cloudSignIn, defaultEndpoint } from '../../services/cloudAuth'
+import { checkForUpdate, platform, type UpdateState } from '../../services/appUpdate'
 import { enqueueAllPhotos, photoSyncEnabled } from '../../db/repo/base'
 import { photoBytes, photoCount } from '../../db/repo/photos'
 import {
@@ -81,6 +82,7 @@ import { currentSchemaVersion } from '../../db/migrations'
 import { storageInfo } from '../../db/persistence'
 import { ROLE_DEFINITIONS, PERMISSIONS, roleName, type RoleCode } from '../../core/permissions'
 import {
+  APP_BUILD,
   APP_NAME,
   APP_VERSION,
   FACILITY_TYPES,
@@ -1598,6 +1600,72 @@ function DemoSettings() {
 
 // --------------------------------------------------------------- about
 
+/** How this copy of the application was installed, in plain words. */
+function platformLabel(): string {
+  switch (platform()) {
+    case 'DESKTOP':
+      return 'Desktop application'
+    case 'ANDROID':
+      return 'Android application'
+    case 'PWA':
+      return 'Installed on the home screen'
+    default:
+      return 'Web browser'
+  }
+}
+
+/**
+ * An explicit "am I current?" for the administrator.
+ *
+ * The banner appears on its own when there is something to say; this is for
+ * the person who wants to check before an outreach rather than be told
+ * during one.
+ */
+function UpdateCheck() {
+  const [state, setState] = useState<UpdateState | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  async function check() {
+    setBusy(true)
+    try {
+      setState(await checkForUpdate(false))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <>
+      <button className="btn block secondary" onClick={() => void check()} disabled={busy}>
+        {busy ? 'Checking…' : 'Check for updates'}
+      </button>
+
+      {state && !busy ? (
+        state.available ? (
+          <AlertBox tone="warn" title="A newer version is available">
+            {state.latestVersion ? `Version ${state.latestVersion}. ` : ''}
+            {state.howToApply === 'DOWNLOAD'
+              ? 'Use the banner at the top of the screen to download it.'
+              : state.howToApply === 'RESTART'
+                ? 'It installs when you next close the application.'
+                : 'Use the banner at the top of the screen to apply it.'}
+          </AlertBox>
+        ) : state.checkedAt && state.latestBuild ? (
+          <AlertBox tone="ok" title="This is the current version">
+            Checked against the outreach server just now.
+          </AlertBox>
+        ) : (
+          <AlertBox tone="muted" title="Could not reach the server">
+            This device is offline, or no cloud address is set. The application is unaffected —
+            it does not need the server to work.
+          </AlertBox>
+        )
+      ) : null}
+    </>
+  )
+}
+
+
 function AboutSettings() {
   const { online, storageBackend } = useApp()
   const toast = useToast()
@@ -1670,6 +1738,13 @@ function AboutSettings() {
             ) : null}
           </div>
         ) : null}
+      </Card>
+
+      <Card title="This installation">
+        <KeyValue k="Version" v={APP_VERSION} />
+        <KeyValue k="Build" v={APP_BUILD} />
+        <KeyValue k="Installed as" v={platformLabel()} />
+        <UpdateCheck />
       </Card>
 
       <Card title="What this version does">
