@@ -111,6 +111,7 @@ export const ROLES = {
   NURSE: 'NURSE',
   LABORATORY: 'LABORATORY',
   BREAST_HEALTH: 'BREAST_HEALTH',
+  PHARMACY: 'PHARMACY',
   DATA_OFFICER: 'DATA_OFFICER',
   LOGISTICS: 'LOGISTICS',
   VOLUNTEER: 'VOLUNTEER',
@@ -219,6 +220,20 @@ export const ROLE_DEFINITIONS: {
       P.BREAST_RECORD,
       P.REFERRAL_CREATE,
       P.FOLLOWUP_VIEW,
+      P.REPORTS_VIEW,
+    ],
+  },
+  {
+    code: ROLES.PHARMACY,
+    name: 'Pharmacy',
+    description: 'Dispensing, medicines stock and the pharmacy queue.',
+    permissions: [
+      ...CLINICAL_READ,
+      // Pharmacy holds the medicines, so it needs to move stock, not just
+      // look at it. It does not record clinical findings.
+      P.INVENTORY_VIEW,
+      P.INVENTORY_EDIT,
+      P.PROCUREMENT_VIEW,
       P.REPORTS_VIEW,
     ],
   },

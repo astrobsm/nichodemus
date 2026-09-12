@@ -77,6 +77,26 @@ CREATE TABLE IF NOT EXISTS sync_changes (
 );
 CREATE INDEX IF NOT EXISTS idx_changes_seq ON sync_changes(seq);
 CREATE INDEX IF NOT EXISTS idx_changes_device ON sync_changes(device_id, seq);
+
+-- Which participant-number block each device owns. Allocated centrally on
+-- first sign-in, because two devices sharing a block would issue the same
+-- participant number to different people - a mistake no later merge can
+-- repair.
+CREATE TABLE IF NOT EXISTS sync_devices (
+  device_id    TEXT PRIMARY KEY,
+  serial_block INTEGER NOT NULL,
+  username     TEXT,
+  first_seen   TEXT NOT NULL,
+  last_seen    TEXT NOT NULL
+);
+
+-- Failed sign-in counters, so the cloud locks an account out just as a device
+-- does. Without it the PIN could be attacked from anywhere, at any rate.
+CREATE TABLE IF NOT EXISTS auth_attempts (
+  username     TEXT PRIMARY KEY,
+  failures     INTEGER NOT NULL DEFAULT 0,
+  locked_until TEXT
+);
 `
 
 export function readDeviceSchema() {

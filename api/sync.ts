@@ -19,6 +19,7 @@ import {
   // The explicit .js extension matters: without it the compiled function
   // emits a bare specifier that Node's ESM loader cannot resolve at runtime.
 } from './_shared/syncModel.js'
+import { corsHeaders } from './_shared/http.js'
 
 export const config = { runtime: 'nodejs' }
 
@@ -221,6 +222,13 @@ export async function handleSync(input: {
 
 /** Web-standard adapter, used by the tests and by any edge runtime. */
 export async function webHandler(request: Request): Promise<Response> {
+  const origin = request.headers.get('origin')
+  const cors = corsHeaders(origin)
+
+  // Preflight: the phone and desktop builds send one before every sync,
+  // because x-sync-token is a custom header on a cross-origin request.
+  if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors })
+
   let parsed: unknown = null
   if (request.method === 'POST') {
     try {
@@ -228,7 +236,7 @@ export async function webHandler(request: Request): Promise<Response> {
     } catch {
       return new Response(JSON.stringify({ ok: false, error: 'Malformed request.' }), {
         status: 400,
-        headers: { 'content-type': 'application/json' },
+        headers: { ...cors, 'content-type': 'application/json' },
       })
     }
   }
@@ -239,7 +247,7 @@ export async function webHandler(request: Request): Promise<Response> {
   })
   return new Response(JSON.stringify(result.body), {
     status: result.status,
-    headers: { 'content-type': 'application/json' },
+    headers: { ...cors, 'content-type': 'application/json' },
   })
 }
 
@@ -294,7 +302,19 @@ export default async function handler(
 ): Promise<void> {
   const header = request.headers['x-sync-token']
   const token = Array.isArray(header) ? (header[0] ?? null) : (header ?? null)
+  const originHeader = request.headers.origin
+  const origin = Array.isArray(originHeader) ? (originHeader[0] ?? null) : (originHeader ?? null)
   const method = request.method ?? 'GET'
+
+  const cors = corsHeaders(origin)
+  for (const [name, value] of Object.entries(cors)) response.setHeader(name, value)
+
+  if (method === 'OPTIONS') {
+    response.statusCode = 204
+    response.end('')
+    return
+  }
+
   const result = await handleSync({
     method,
     token,
