@@ -12,6 +12,7 @@
     "build": "tsc --noEmit && vite build",
     "postbuild": "node scripts/stamp-build.mjs post",
     "preview": "vite preview --port 4173",
+    "pretest": "node scripts/stamp-build.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",

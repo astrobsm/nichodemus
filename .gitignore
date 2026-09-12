@@ -26,3 +26,9 @@ android/
 # commit that defines its own build identity, leaving every phone
 # permanently convinced it is out of date.
 public/download/
+
+# Generated at build time from the commit being built. Cannot be committed:
+# its contents name the commit that would contain it, so a committed copy
+# is always one commit stale and every build leaves the tree dirty.
+src/core/buildInfo.ts
+api/_shared/buildInfo.ts

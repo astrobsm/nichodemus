@@ -87,11 +87,15 @@ function writeIfChanged(path, contents) {
 
 /** Generates the TypeScript the application and the API both import. */
 export function writeSources(info) {
-  // A build environment with no git and no commit variables - a deployment
-  // built from an upload rather than a checkout - cannot work out which
-  // commit it is. The generated files are committed precisely so that this
-  // case keeps the right answer instead of overwriting it with 'nogit'.
-  if (!info.known && existsSync(resolve(root, 'src/core/buildInfo.ts'))) return []
+  // An environment that cannot name the commit cannot produce a build
+  // identity that matches anyone else's. Every installed copy would then see
+  // a permanent difference and offer an update that changes nothing, so say
+  // so loudly rather than writing 'nogit' and letting it ship.
+  if (!info.known) {
+    console.warn(
+      'WARNING: this environment cannot identify the commit (no git, and no VERCEL_GIT_COMMIT_SHA). The build identity will not match other builds of the same source, so devices will be told - wrongly, and permanently - that an update is available.',
+    )
+  }
 
   const body = `${HEADER}
 export const APP_VERSION = '${info.version}'

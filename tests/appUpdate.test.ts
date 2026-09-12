@@ -94,13 +94,14 @@ describe('stamping a build', () => {
     expect(buildInfo().build).toBe(buildInfo().build)
   })
 
-  it('keeps the committed identity when the environment has no git', async () => {
+  it('knows when it cannot identify the commit', async () => {
+    // Such a build would disagree with every other build of the same source,
+    // and every device would be told for ever that an update exists. The
+    // release script refuses to publish one; this is the flag it reads.
     // @ts-expect-error - plain JS build script, no type declarations
-    const { writeSources } = await import('../scripts/stamp-build.mjs')
-    const before = readFileSync(resolve('src/core/buildInfo.ts'), 'utf8')
-    const written = writeSources({ version: '9.9.9', build: 'nogit', builtAt: 'x', known: false })
-    expect(written).toEqual([])
-    expect(readFileSync(resolve('src/core/buildInfo.ts'), 'utf8')).toBe(before)
+    const { buildInfo } = await import('../scripts/stamp-build.mjs')
+    const info = buildInfo()
+    expect(info.known).toBe(info.build !== 'nogit')
   })
 
   it('replaces the marker in a built service worker', async () => {
