@@ -14,11 +14,11 @@
 import { createClient, type Client } from '@libsql/client'
 import {
   APPLY_ORDER,
-  FOREIGN_KEYS,
-  REF_SUFFIX,
   incomingWins,
   type SyncRecord,
-} from '../src/services/syncModel'
+  // The explicit .js extension matters: without it the compiled function
+  // emits a bare specifier that Node's ESM loader cannot resolve at runtime.
+} from './_shared/syncModel.js'
 
 export const config = { runtime: 'nodejs' }
 
@@ -207,5 +207,3 @@ export default async function handler(request: Request): Promise<Response> {
     return json({ ok: false, error: 'The cloud could not complete the request.' }, 500)
   }
 }
-
-export { FOREIGN_KEYS, REF_SUFFIX }
