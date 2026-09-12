@@ -71,7 +71,7 @@ Full walkthrough: **[docs/CLOUD.md](docs/CLOUD.md)**.
 ```bash
 npm run dev        # http://localhost:5173
 npm run build      # dist/ — the web application, ~2 MB
-npm test           # 159 tests against a real SQLite database
+npm test           # 195 tests against a real SQLite database
 npm run typecheck
 ```
 
@@ -146,8 +146,10 @@ tests/sync.test.ts           20  two-device merge, conflicts, number blocks
 tests/syncServer.test.ts     23  the cloud endpoint: auth, push, pull, paging
 tests/cloudSchema.test.ts     8  the generated cloud schema accepts every table
 tests/cloudAuth.test.ts      20  cloud sign-in, lockout, CORS, block allocation
+tests/photos.test.ts         19  photography consent, erasure, staying on device
+tests/cloudBackup.test.ts    17  chunked off-site backup, pruning, ciphertext only
                             ───
-                            159  all passing
+                            195  all passing
 ```
 
 The suites run against a real SQLite database, not a mock.
@@ -169,6 +171,14 @@ management, clinical thresholds, the cloud settings or the audit trail; the
 pharmacist could manage medicines stock but could record no clinical finding.
 The administrator's device issued NUG-0001 and the nurse's NUG-10001 — separate
 blocks, allocated by the cloud rather than by hand.
+
+Clinical photography and the off-site backup were verified against the same
+deployment. A 2400px, 225 KB camera image was downscaled to 1440px and 86 KB
+before anything was stored; the camera button did not exist until a separate
+photography consent was recorded; withdrawing that consent erased the image
+rather than hiding it; and photographs were confirmed to be excluded from
+synchronisation by default. A 700 KB encrypted file was uploaded in three
+parts, listed, fetched back and compared byte for byte against what was sent.
 
 The Android build was verified by deleting `android/` and running `npm run apk`
 from scratch: 1m46s, package `org.nugoutreach.app`, labelled **NUG Outreach**,

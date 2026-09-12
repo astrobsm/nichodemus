@@ -180,10 +180,16 @@ numbers already issued cannot be renumbered.
 
 ## 5. What syncs, and what does not
 
-**Synchronised** — 28 tables: the project, stations, team, tasks, users,
+**Synchronised** — 29 tables: the project, stations, team, tasks, users,
 participants, consent, vitals, glucose, consultations, wounds, breast
 examinations, facilities, referrals, follow-ups, queue movements, inventory,
 procurement, budget, expenses, mobilisation, logistics and the event checklist.
+
+**Synchronised only if you ask** — clinical photographs. They are the 29th
+table and the one exception: an image identifies a person far more surely than
+a name does, so it stays on the device that took it until an administrator
+turns it on under Settings → Cloud sync. Turning it on also sends the images
+already taken.
 
 **Kept on the device that wrote it** — the audit trail, backup records, local
 application settings and the sync bookkeeping itself. The audit trail is
@@ -201,6 +207,34 @@ Last-write-wins, decided identically on the device and on the server:
 
 Deletions replicate as soft deletions — the row is marked, never removed —
 so a delete on one device cannot be silently undone by a stale copy on another.
+
+---
+
+## 5a. Off-site backup
+
+Synchronisation is not a backup. It copies the records; it does not copy the
+audit trail, and a mistake replicates as faithfully as a correction. The
+backup file is the only thing that restores a device exactly as it was.
+
+**Settings → Backup → Off-site copy** keeps that file somewhere other than the
+phone. Turn on *Also keep each backup in the cloud*, and each backup you take
+is uploaded after it is written locally.
+
+What is uploaded is already sealed with AES-256-GCM under the password chosen
+on the device. `api/backup.ts` imports no cryptography at all — there is no
+code path by which the server could open one. What the cloud database holds is
+a file size, a device identifier and ciphertext.
+
+The consequence is worth stating in full: **if the password is lost, the
+backup is lost.** Write it down and keep it away from the phone.
+
+Uploads go in 256 KB parts and a backup is only offered for restore once every
+part has arrived, so a connection that drops halfway leaves nothing that could
+be mistaken for a usable backup. The newest three copies per device are kept
+and older ones are pruned as new ones complete.
+
+To restore: **Settings → Backup → Show backups in the cloud → Restore**, then
+the password that backup was made with.
 
 ---
 

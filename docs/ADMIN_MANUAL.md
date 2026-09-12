@@ -312,15 +312,55 @@ is sound.
 
 Stated plainly so nobody is surprised on the day:
 
-- **One device holds the real record.** There is no synchronisation between
-  devices. Every record already carries a UUID, timestamps, a device
-  identifier and a version number so synchronisation can be added later without
-  changing the database, but it is not built.
-- **No clinical photography.** The architecture allows for it; it is not
-  implemented.
-- **No cloud backup.** Deliberate. Backups are files you control.
+- **No SMS reminders.** Follow-up calls are made by a person, from the
+  follow-up queue.
+- **No label printing.** Participant numbers are written by hand on the card.
+- **English only.** Consent must be explained verbally in the participant's
+  own language; the screens are not translated.
 
-Settings → About lists these as NOT IMPLEMENTED rather than hiding them.
+Settings → About lists these as NOT IMPLEMENTED rather than hiding them, and
+lists what *is* built beside them.
+
+### Clinical photography
+
+**Participant → Photographs.** Built, and deliberately restrictive:
+
+- Nothing can be photographed until a **separate photography consent** is
+  recorded. Consent to be treated is not consent to be photographed, and the
+  camera button does not appear until you record one.
+- Images go into the application's own database, **never into the phone's
+  picture gallery** — so they are not swept up by whatever photo backup the
+  owner of the phone happens to use.
+- Each image is reduced to 1440 pixels on its longest side before it is
+  stored, about 90 KB instead of 3 MB.
+- **Withdrawing consent erases the images**, immediately and irreversibly. So
+  does deleting one. The audit trail keeps the fact that an image existed and
+  who removed it; it never holds the image.
+- Photographs are **not synchronised** unless you turn that on under
+  Settings → Cloud sync. Off is the default: a photograph identifies a person
+  far more surely than a name does.
+
+Tell the team: no faces, no house numbers, no name written on a card in the
+frame, unless it is clinically necessary.
+
+### Off-site backup
+
+**Settings → Backup → Off-site copy.** A backup on the phone that took it
+survives a corrupted database. It does not survive the phone being lost,
+stolen or dropped in water, which on a field day is likelier.
+
+Turn on *Also keep each backup in the cloud* and every backup you take is
+copied off the device. It is encrypted on the phone first, with the password
+you choose, and the server never receives that password — so whoever can read
+the cloud database sees a file size and a device name, and not one record.
+
+That cuts both ways: **a cloud copy nobody can decrypt is not a backup.**
+Write the backup password down and keep it somewhere other than the phone.
+Nobody, including the people who wrote this application, can recover it.
+
+The three most recent copies from each device are kept; older ones are removed
+automatically so the free tier does not fill up before the backup that
+matters.
 
 ---
 

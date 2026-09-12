@@ -357,16 +357,29 @@ export function Toggle({
   checked: boolean
   onChange: (v: boolean) => void
 }) {
+  // The control is a switch, and it is tied to its own label. Without the
+  // association a screen reader announces nothing but "Yes" or "No", which
+  // tells the listener which state it is in but not what it controls.
+  const id = useId()
   return (
     <div className="switch-row">
       <div style={{ flex: 1 }}>
-        <div className="switch-label">{label}</div>
-        {help ? <div className="switch-help">{help}</div> : null}
+        <div className="switch-label" id={`${id}-label`}>
+          {label}
+        </div>
+        {help ? (
+          <div className="switch-help" id={`${id}-help`}>
+            {help}
+          </div>
+        ) : null}
       </div>
       <button
         type="button"
         className="choice"
-        aria-pressed={checked}
+        role="switch"
+        aria-checked={checked}
+        aria-labelledby={`${id}-label`}
+        aria-describedby={help ? `${id}-help` : undefined}
         onClick={() => onChange(!checked)}
       >
         {checked ? 'Yes' : 'No'}
