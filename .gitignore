@@ -20,3 +20,9 @@ android/
 # desktop builds point at. It is not a secret, and a checkout that lacks it
 # produces installers that cannot find the outreach.
 !.env
+
+# The packaged Android app, rebuilt on every release and uploaded straight
+# to the deployment (see .vercelignore). Committing it would change the
+# commit that defines its own build identity, leaving every phone
+# permanently convinced it is out of date.
+public/download/

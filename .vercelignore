@@ -1,0 +1,15 @@
+# What NOT to upload when deploying.
+#
+# This file exists mainly to override .gitignore, which Vercel falls back to
+# when it is absent. The Android package under public/download is deliberately
+# git-ignored - it is an 8 MB binary rebuilt on every release, and committing
+# it would change the very commit that defines its own build identity, so a
+# phone would compare itself against a deployment it could never match. It
+# still has to reach the deployment, which is what this file allows.
+node_modules
+android
+release
+dist
+.git
+.env.local
+.vercel

@@ -55,6 +55,10 @@ function generatedBuild() {
 
 // --------------------------------------------------------------- checks
 
+// The build identity is the commit. Everything - the deployment, the APK and
+// the desktop installer - must be built from the same one, or a device will
+// compare itself against a deployment it can never match and offer an update
+// that changes nothing.
 if (!tryRun('git diff --quiet && git diff --cached --quiet')) {
   console.error(
     '\nThere are uncommitted changes.\n\n' +
@@ -69,7 +73,20 @@ if (!tryRun('git diff --quiet && git diff --cached --quiet')) {
 say('Building the web application')
 run('npm run build')
 const build = generatedBuild()
+const head = execSync('git rev-parse HEAD', { cwd: root }).toString().trim().slice(0, 9)
 console.log(`    build ${build}`)
+if (build !== head) {
+  console.error(
+    `
+The build identity (${build}) is not the current commit (${head}).
+` +
+      'Every copy compares itself against the deployment by this value, so a
+' +
+      'mismatch means permanent, useless update prompts. Stopping.
+',
+  )
+  process.exit(1)
+}
 
 if (!existsSync(resolve(root, 'dist/sw.js'))) {
   console.error('dist/sw.js is missing — installed copies would never update.')

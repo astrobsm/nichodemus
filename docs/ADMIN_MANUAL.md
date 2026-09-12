@@ -364,7 +364,72 @@ matters.
 
 ---
 
-## 10. If the worst happens
+---
+
+## 10. Updates
+
+Every installed copy checks whether it is running the current version and
+tells you when it is not. Nothing ever updates in the middle of what you are
+doing: the application waits for you to say so.
+
+### What you do to publish one
+
+From a clean checkout, on a machine with the Android and desktop toolchains:
+
+```bash
+npm run release
+```
+
+That builds the web application, the Android package and the desktop
+installer **from the same commit**, deploys the web application and publishes
+the packaged builds. Building them together is the point — all three carry
+the same build identity, and that identity is what every device compares
+itself against.
+
+It refuses to run with uncommitted changes, and it stops if the service
+worker was not stamped, because an unstamped worker is identical to the last
+one and installed copies would never notice the difference.
+
+| Flag | Effect |
+| --- | --- |
+| `--skip-desktop` | Much faster; skips the 124 MB installer |
+| `--skip-android` | Web and desktop only |
+| `--no-publish` | Build everything, deploy nothing |
+
+### What each kind of copy does
+
+| Where it is installed | What happens |
+| --- | --- |
+| **Web browser** | The next time the page is opened, the update downloads in the background. A bar appears at the top: **Update now**. |
+| **Added to the home screen (PWA)** | The same. It also re-checks every half hour and whenever the app is brought back to the front, so a device left open through an outreach still notices. |
+| **Desktop** | Checks on startup and once a day, downloads in the background, and installs **when you next close the application**. The bar offers **Restart now** if you would rather not wait. |
+| **Android** | Notices within the hour and offers **Download**. You then confirm the install, as with any app installed outside the Play Store. |
+
+### Why Android is different
+
+Android does not let an application installed from a file install anything by
+itself — that is an operating-system rule, not a shortcoming of this
+application. It can notice the update, tell you, and hand you the download in
+one tap; the confirmation is yours. The first time, the phone asks you to
+allow installs from whichever app is doing the downloading.
+
+### Nothing is lost by updating
+
+Your records live in the database on the device, not in the page. Updating
+replaces the application, never the data. A device with no signal simply does
+not check, and carries on working with the version it has — that is normal,
+and no records are at risk.
+
+### Checking by hand
+
+**Settings → About → Check for updates** says which build this device is on
+and whether the server has a newer one. Do this before an outreach, on a
+connection, rather than finding out during one.
+
+The build identifier shown there is the commit the code came from. Quote it
+if you ever report a problem.
+
+## 11. If the worst happens
 
 **The phone is lost or stolen.** The database is protected by the application
 PIN and by the device lock. Restore your most recent backup onto another

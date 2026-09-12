@@ -57,7 +57,17 @@ npm run desktop:build      # → release/desktop/NUG-Outreach-Setup-1.0.0.exe
 
 npm run cloud:setup        # create the Turso tables (free tier)
 npm run cloud:deploy       # deploy the app and /api/sync to Vercel
+
+npm run release            # build all three from one commit, and publish
 ```
+
+`npm run release` is how an update reaches devices that are already in use.
+It builds the web application, the Android package and the desktop installer
+from the same commit so that all three carry one build identity, then deploys
+and publishes them. Browser and home-screen copies download the update in the
+background and offer it; desktop copies install on next close; Android copies
+offer a one-tap download, because Android does not permit a sideloaded app to
+install an update unattended.
 
 Once the outreach is in the cloud, every other member of staff opens the same
 web address and signs in with the username and PIN the administrator gave
@@ -71,7 +81,7 @@ Full walkthrough: **[docs/CLOUD.md](docs/CLOUD.md)**.
 ```bash
 npm run dev        # http://localhost:5173
 npm run build      # dist/ — the web application, ~2 MB
-npm test           # 195 tests against a real SQLite database
+npm test           # 216 tests against a real SQLite database
 npm run typecheck
 ```
 
@@ -148,8 +158,9 @@ tests/cloudSchema.test.ts     8  the generated cloud schema accepts every table
 tests/cloudAuth.test.ts      20  cloud sign-in, lockout, CORS, block allocation
 tests/photos.test.ts         19  photography consent, erasure, staying on device
 tests/cloudBackup.test.ts    17  chunked off-site backup, pruning, ciphertext only
+tests/appUpdate.test.ts      21  build stamping, the update check, what it reports
                             ───
-                            195  all passing
+                            216  all passing
 ```
 
 The suites run against a real SQLite database, not a mock.
