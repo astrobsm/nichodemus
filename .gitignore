@@ -12,3 +12,6 @@ android/
 # Local cloud credentials - never commit
 .env.local
 .vercel
+
+.vercel
+.env*

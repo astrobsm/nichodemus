@@ -21,7 +21,8 @@
     "desktop:build": "npm run build && electron-builder --publish never",
     "cloud:setup": "node scripts/cloud-setup.mjs",
     "cloud:deploy": "vercel deploy --prod",
-    "cloud:verify": "node scripts/cloud-verify.mjs"
+    "cloud:verify": "node scripts/cloud-verify.mjs",
+    "build:ci": "node scripts/copy-wasm.mjs && tsc --noEmit && vite build"
   },
   "dependencies": {
     "@capacitor/core": "^8.5.2",
@@ -46,6 +47,7 @@
     "fake-indexeddb": "^6.0.0",
     "sharp": "^0.35.4",
     "typescript": "^5.6.3",
+    "vercel": "^59.16.0",
     "vite": "^5.4.11",
     "vitest": "^2.1.8"
   },
