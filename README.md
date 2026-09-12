@@ -59,15 +59,19 @@ npm run cloud:setup        # create the Turso tables (free tier)
 npm run cloud:deploy       # deploy the app and /api/sync to Vercel
 ```
 
-Full walkthrough, including assigning a participant-number block to each
-device: **[docs/CLOUD.md](docs/CLOUD.md)**.
+Once the outreach is in the cloud, every other member of staff opens the same
+web address and signs in with the username and PIN the administrator gave
+them. No wizard, no device key, and each device is reserved its own
+participant-number block automatically.
+
+Full walkthrough: **[docs/CLOUD.md](docs/CLOUD.md)**.
 
 ## Developing
 
 ```bash
 npm run dev        # http://localhost:5173
 npm run build      # dist/ — the web application, ~2 MB
-npm test           # 88 tests against a real SQLite database
+npm test           # 159 tests against a real SQLite database
 npm run typecheck
 ```
 
@@ -139,9 +143,11 @@ tests/operations.test.ts     16  inventory, expiry, procurement, budget, analyti
 tests/security.test.ts       29  PINs, lockout, roles, audit, backup, rollback
 tests/performance.test.ts     8  1,000 participants, ~4,500 clinical records
 tests/sync.test.ts           20  two-device merge, conflicts, number blocks
-tests/syncServer.test.ts     17  the cloud endpoint: auth, push, pull, paging
+tests/syncServer.test.ts     23  the cloud endpoint: auth, push, pull, paging
+tests/cloudSchema.test.ts     8  the generated cloud schema accepts every table
+tests/cloudAuth.test.ts      20  cloud sign-in, lockout, CORS, block allocation
                             ───
-                            125  all passing
+                            159  all passing
 ```
 
 The suites run against a real SQLite database, not a mock.
@@ -151,6 +157,18 @@ registration, an elevated blood pressure alert, persistence across a full
 reload, **registering a participant with the network completely disconnected**,
 a 6-page PDF report, a de-identified CSV export, and an encrypted backup file
 with no readable SQLite header inside it.
+
+The staff workflow was verified end to end against the deployed application at
+`https://nichodemus.vercel.app`, on three separate browser profiles standing in
+for three devices: an administrator set the outreach up, created a Nurse and a
+Pharmacy account and synchronised; the nurse and the pharmacist then opened the
+same address on a device that had never run the application, were taken
+straight to a sign-in screen with no wizard and no device key, and saw the
+participant the administrator had registered. The nurse could not reach user
+management, clinical thresholds, the cloud settings or the audit trail; the
+pharmacist could manage medicines stock but could record no clinical finding.
+The administrator's device issued NUG-0001 and the nurse's NUG-10001 — separate
+blocks, allocated by the cloud rather than by hand.
 
 The Android build was verified by deleting `android/` and running `npm run apk`
 from scratch: 1m46s, package `org.nugoutreach.app`, labelled **NUG Outreach**,

@@ -122,21 +122,41 @@ free hobby tier is sufficient.
 
 ## 4. Connect the devices
 
-On each device: **Settings → Cloud sync**.
+There are two kinds of device, and only the first one needs any setting up.
 
-| Field | Value |
-| --- | --- |
-| Web address | `https://your-project.vercel.app` |
-| Device key | The `SYNC_TOKEN` |
-| Number block | **A different number on every device** |
+### 4.1 The device that sets the outreach up (once, by the administrator)
 
-Then **Save cloud settings** and **Synchronise now**.
+1. Open the address, choose **Set up a new outreach** and complete the wizard.
+2. Create an account for every member of the team:
+   **Settings → Users → Add user account**.
+3. **Settings → Cloud sync** — enter the web address and the `SYNC_TOKEN` as
+   the device key, **Save cloud settings**, then **Synchronise now**.
 
-### The number block matters
+That last step is what puts the outreach and the accounts into the cloud.
+Until it has run, nobody else can sign in, because there is nothing to sign
+in to.
+
+### 4.2 Everyone else (a nurse, a doctor, a pharmacist, a volunteer)
+
+Open the same web address and sign in with the username and PIN the
+administrator issued. That is the whole procedure.
+
+The device is not set up, no project is created, no web address is typed and
+no device key is entered. The application asks the address it was served from
+whether an outreach is already running there; when there is one it goes
+straight to a sign-in screen. Signing in brings down the project, the team,
+the settings and the records, and the device then works offline exactly like
+every other.
+
+A device that is **not** served from the cloud — the Android build or the
+desktop application, which run from their own private addresses — asks for the
+web address once on that first sign-in, and remembers it.
+
+### 4.3 The number block is allocated for you
 
 Two phones registering people at the same time with no signal between them
 would both issue NUG-0001, and the merge would have to discard one of two real
-participants. Each device is therefore given its own block:
+participants. Each device therefore issues from its own block:
 
 | Block | Participant numbers |
 | --- | --- |
@@ -144,9 +164,17 @@ participants. Each device is therefore given its own block:
 | 1 | NUG-10001 to NUG-20000 |
 | 2 | NUG-20001 to NUG-30000 |
 
-Write the block number on a label and stick it to the back of each phone.
-Assign the blocks **before** the outreach: changing one afterwards does not
-renumber anybody already registered.
+**You no longer assign these by hand.** The cloud reserves a free block for
+each device the first time it signs in, and gives that same device the same
+block every time afterwards. The device that set the outreach up keeps block 0
+and claims it on its first synchronisation, so it can never be handed out
+twice.
+
+The field is still there under **Settings → Cloud sync** for the rare case of
+a device that will never touch the cloud at all. If you do set one by hand and
+it collides with a block already taken, the next synchronisation says so in
+red — and you must stop registering on one of the two devices, because
+numbers already issued cannot be renumbered.
 
 ---
 
@@ -206,10 +234,13 @@ closes the application, reopens it and checks the record is still there.
 
 ## 7. Running the outreach with several devices
 
-1. **Before the day:** create the project on one device, set it up fully, then
-   sync. Every other device pulls the project, stations, team, thresholds and
-   facilities rather than being set up separately.
-2. **Assign number blocks**, one per device, and label the devices.
+1. **Before the day:** create the project on one device, set it up fully,
+   create an account for every member of the team, then sync. Every other
+   device pulls the project, stations, team, thresholds and facilities rather
+   than being set up separately.
+2. **Hand out usernames and initial PINs.** Each person opens the web address
+   on their own device and signs in; the cloud reserves that device its own
+   participant-number block automatically.
 3. **On the day:** work entirely offline. Sync if and when a signal appears —
    there is no need, and no harm.
 4. **End of day:** sync each device in turn, wherever there is a connection.

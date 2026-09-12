@@ -30,6 +30,17 @@ if two nurses share one login, nobody can tell who recorded which reading.
 Set an initial PIN and hand it over privately. The person is required to choose
 their own PIN when they first sign in, and from that point you cannot see it.
 
+**How they get onto their own device.** Once you have created the accounts,
+go to **Settings → Cloud sync** and press **Synchronise now**. Each person
+then opens the same web address on their own phone or computer and signs in
+with the username and PIN you gave them — nothing else. They do not set up a
+project, do not type a web address and are not given a device key, and the
+cloud reserves each device its own participant-number block automatically so
+two devices can never issue the same participant number.
+
+Until you have synchronised, nobody can sign in anywhere else: the accounts
+exist only on your device. Do it before people arrive.
+
 #### Roles
 
 | Role | Can do |
@@ -38,6 +49,7 @@ their own PIN when they first sign in, and from that point you cannot see it.
 | **Medical Director** | All clinical records, referrals, reports, identifiable exports, clinical thresholds, audit |
 | **Doctor** | Clinical assessment, all clinical records, referrals |
 | **Nurse** | Vitals, glucose, wound care, consultations, registration, referrals |
+| **Pharmacy** | Dispensing, medicines stock, procurement and the pharmacy queue. Sees clinical records but records none |
 | **Laboratory user** | Glucose screening only |
 | **Breast health user** | Breast examinations and related referrals |
 | **Data officer** | Registration, editing, follow-up management, reporting, export, backup |
