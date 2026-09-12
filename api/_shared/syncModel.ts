@@ -156,6 +156,8 @@ export interface PushResponse {
   accepted: number
   rejected: { uuid: string; reason: string }[]
   cursor: number
+  /** Another device has already reserved this device's number block. */
+  blockConflict?: boolean
 }
 
 export interface PullResponse {
@@ -163,6 +165,7 @@ export interface PullResponse {
   records: (SyncRecord & { seq: number })[]
   cursor: number
   more: boolean
+  blockConflict?: boolean
 }
 
 export interface SyncErrorResponse {

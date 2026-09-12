@@ -278,3 +278,59 @@ describe('cross-origin access', () => {
     expect(res.headers.get('access-control-allow-origin')).toBe('https://nichodemus.vercel.app')
   })
 })
+
+describe('the device that set the outreach up', () => {
+  /**
+   * It chose its number block offline, before any cloud existed, and never
+   * signs in through /api/auth. If the cloud does not learn about that block
+   * it will hand the same one to the first member of staff who joins, and two
+   * devices will issue the same participant number to two different people.
+   */
+  async function syncAs(deviceId: string, serialBlock: number) {
+    const res = await sync(
+      new Request('https://nug.test/api/sync', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-sync-token': SYNC_TOKEN },
+        body: JSON.stringify({ action: 'ping', deviceId, serialBlock }),
+      }),
+    )
+    return res.json() as Promise<{ ok: boolean; blockConflict?: boolean }>
+  }
+
+  it('reserves its block by synchronising, so no one else is given it', async () => {
+    await syncAs('founder-phone', 900)
+
+    const joiner = await (
+      await post(auth, { username: 'ada', pin: PIN, deviceId: 'joiner-phone' })
+    ).json()
+    expect(joiner.serialBlock).not.toBe(900)
+    expect(joiner.serialBlock).toBeGreaterThan(900)
+  })
+
+  it('keeps the same block when that device later signs in', async () => {
+    await syncAs('settled-phone', 950)
+    const signedIn = await (
+      await post(auth, { username: 'ada', pin: PIN, deviceId: 'settled-phone' })
+    ).json()
+    expect(signedIn.serialBlock).toBe(950)
+  })
+
+  it('says so when a second device claims a block that is already taken', async () => {
+    const first = await syncAs('twin-a', 980)
+    expect(first.blockConflict).toBe(false)
+
+    const second = await syncAs('twin-b', 980)
+    expect(second.blockConflict).toBe(true)
+  })
+
+  it('synchronises normally when no block is declared', async () => {
+    const res = await sync(
+      new Request('https://nug.test/api/sync', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-sync-token': SYNC_TOKEN },
+        body: JSON.stringify({ action: 'ping', deviceId: 'quiet-phone' }),
+      }),
+    )
+    expect((await res.json()).ok).toBe(true)
+  })
+})

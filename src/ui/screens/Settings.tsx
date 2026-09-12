@@ -1009,6 +1009,7 @@ function SyncSettings() {
   const [token, setToken] = useState(config.token)
   const [block, setBlock] = useState(String(config.serialBlock))
   const [busy, setBusy] = useState(false)
+  const [clash, setClash] = useState(false)
 
   const range = serialRange(Number(block) || 0)
 
@@ -1032,6 +1033,7 @@ function SyncSettings() {
     try {
       const result = await runSync()
       refresh()
+      setClash(result.blockConflict)
       toast(
         'ok',
         `Synchronised: ${result.pushed} sent, ${result.pulled} received` +
@@ -1046,6 +1048,14 @@ function SyncSettings() {
 
   return (
     <>
+      {clash ? (
+        <AlertBox tone="danger" title="Two devices share a number block">
+          Another device is already issuing participant numbers from block {block}. Both will give
+          the same number to different people, and that cannot be corrected afterwards. Stop
+          registering on one of them and give it an unused block below, then synchronise again.
+        </AlertBox>
+      ) : null}
+
       <AlertBox tone="info" title="The device stays in charge">
         Synchronisation is optional and never blocks care. Registration, screening and every
         clinical record work exactly as before with no connection; changes are queued here and

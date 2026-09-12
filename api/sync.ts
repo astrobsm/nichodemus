@@ -106,6 +106,50 @@ async function upsert(record: SyncRecord, deviceId: string): Promise<'accepted' 
   return 'accepted'
 }
 /**
+ * Records which participant-number block a device is issuing from.
+ *
+ * The device that sets the outreach up chooses its block offline, long before
+ * a cloud exists, and never signs in through /api/auth - so without this the
+ * allocator there would hand that same block to the first member of staff who
+ * joined, and two devices would issue the same participant number to two
+ * different people. That is not repairable afterwards, so every sync claims
+ * the block the device is actually using.
+ */
+async function claimBlock(
+  deviceId: string,
+  block: number,
+): Promise<{ block: number; conflict: boolean }> {
+  const now = new Date().toISOString()
+
+  const mine = await db().execute({
+    sql: 'SELECT serial_block FROM sync_devices WHERE device_id = ?',
+    args: [deviceId],
+  })
+  if (mine.rows.length > 0) {
+    const held = Number(mine.rows[0].serial_block)
+    await db().execute({
+      sql: 'UPDATE sync_devices SET last_seen = ? WHERE device_id = ?',
+      args: [now, deviceId],
+    })
+    // A device whose local block no longer matches the one reserved for it
+    // has been renumbered by hand. Say so rather than let it drift.
+    return { block: held, conflict: held !== block }
+  }
+
+  const taken = await db().execute({
+    sql: 'SELECT device_id FROM sync_devices WHERE serial_block = ?',
+    args: [block],
+  })
+  await db().execute({
+    sql: `INSERT INTO sync_devices (device_id, serial_block, first_seen, last_seen)
+          VALUES (?, ?, ?, ?)
+          ON CONFLICT(device_id) DO UPDATE SET last_seen = excluded.last_seen`,
+    args: [deviceId, block, now, now],
+  })
+  return { block, conflict: taken.rows.length > 0 }
+}
+
+/**
  * The endpoint's logic, independent of how the request arrived.
  *
  * Vercel's Node runtime hands functions a Node request/response pair, while
@@ -132,6 +176,7 @@ export async function handleSync(input: {
     records?: SyncRecord[]
     cursor?: number
     limit?: number
+    serialBlock?: number
   }
   if (!body || typeof body !== 'object') {
     return json({ ok: false, error: 'Malformed request.' }, 400)
@@ -140,6 +185,14 @@ export async function handleSync(input: {
   const deviceId = String(body.deviceId ?? 'unknown').slice(0, 64)
 
   try {
+    // Claiming happens before the action so that a device which only ever
+    // pulls still reserves the block it is issuing numbers from.
+    let blockConflict = false
+    if (typeof body.serialBlock === 'number' && Number.isFinite(body.serialBlock)) {
+      const claim = await claimBlock(deviceId, Math.max(0, Math.trunc(body.serialBlock)))
+      blockConflict = claim.conflict
+    }
+
     if (body.action === 'push') {
       const records = Array.isArray(body.records) ? body.records : []
       if (records.length > MAX_RECORDS) {
@@ -171,7 +224,7 @@ export async function handleSync(input: {
       }
 
       const seq = await db().execute('SELECT COALESCE(MAX(seq), 0) AS seq FROM sync_changes')
-      return json({ ok: true, accepted, rejected, cursor: Number(seq.rows[0].seq) })
+      return json({ ok: true, accepted, rejected, cursor: Number(seq.rows[0].seq), blockConflict })
     }
 
     if (body.action === 'pull') {
@@ -201,12 +254,12 @@ export async function handleSync(input: {
       }))
 
       const nextCursor = records.length ? records[records.length - 1].seq : cursor
-      return json({ ok: true, records, cursor: nextCursor, more })
+      return json({ ok: true, records, cursor: nextCursor, more, blockConflict })
     }
 
     if (body.action === 'ping') {
       const r = await db().execute('SELECT COALESCE(MAX(seq), 0) AS seq FROM sync_changes')
-      return json({ ok: true, cursor: Number(r.rows[0].seq) })
+      return json({ ok: true, cursor: Number(r.rows[0].seq), blockConflict })
     }
 
     return json({ ok: false, error: `Unknown action: ${body.action}` }, 400)

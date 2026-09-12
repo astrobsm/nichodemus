@@ -298,8 +298,8 @@ export class SyncError extends Error {
   }
 }
 
-async function call<T>(body: unknown): Promise<T> {
-  const { endpoint, token } = syncConfig()
+async function call<T>(body: object): Promise<T> {
+  const { endpoint, token, serialBlock } = syncConfig()
   if (!endpoint) throw new SyncError('No cloud address is configured.')
 
   let response: Response
@@ -307,7 +307,11 @@ async function call<T>(body: unknown): Promise<T> {
     response = await fetch(`${endpoint}/api/sync`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-sync-token': token },
-      body: JSON.stringify(body),
+      // The block travels with every request so the cloud knows it is taken.
+      // The device that set the outreach up chose its block offline and never
+      // signed in, so this is the only thing that stops the allocator handing
+      // the same block to the first member of staff to join.
+      body: JSON.stringify({ ...body, serialBlock }),
     })
   } catch {
     throw new SyncError(
@@ -331,6 +335,12 @@ export interface SyncOutcome {
   deferred: number
   cursor: number
   pendingAfter: number
+  /**
+   * True when another device has already reserved this device's participant
+   * number block. Both would then issue the same number to different people,
+   * which no later merge can undo, so it has to reach a human.
+   */
+  blockConflict: boolean
 }
 
 /**
@@ -346,6 +356,7 @@ export async function runSync(): Promise<SyncOutcome> {
   let pushed = 0
   let pulled = 0
   let deferred = 0
+  let blockConflict = false
 
   const runId = await transaction(() => {
     const { id } = run(
@@ -364,6 +375,7 @@ export async function runSync(): Promise<SyncOutcome> {
       if (records.length > 0) {
         const result = await call<PushResponse>({ action: 'push', deviceId: device, records })
         pushed += result.accepted
+        if (result.blockConflict) blockConflict = true
       }
       await transaction(() => clearOutbox(keys))
       if (keys.length < 400) break
@@ -378,6 +390,7 @@ export async function runSync(): Promise<SyncOutcome> {
         cursor,
         limit: 400,
       })
+      if (result.blockConflict) blockConflict = true
       if (result.records.length > 0) {
         const outcome = await transaction(() => applyRecords(result.records))
         pulled += outcome.applied
@@ -407,7 +420,7 @@ export async function runSync(): Promise<SyncOutcome> {
       })
     })
 
-    return { pushed, pulled, deferred, cursor: finalCursor, pendingAfter }
+    return { pushed, pulled, deferred, cursor: finalCursor, pendingAfter, blockConflict }
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Synchronisation failed.'
     await transaction(() => {
