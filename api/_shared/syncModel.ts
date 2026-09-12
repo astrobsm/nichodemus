@@ -86,6 +86,11 @@ export const FOREIGN_KEYS: Record<string, Record<string, string>> = {
   mobilisation_activities: { project_id: 'projects' },
   logistics_items: { project_id: 'projects' },
   event_checklists: { project_id: 'projects' },
+  clinical_photos: {
+    participant_id: 'participants',
+    project_id: 'projects',
+    wound_id: 'wounds',
+  },
 }
 
 /**
@@ -123,6 +128,8 @@ export const APPLY_ORDER = [
   'referrals',
   'followups',
   'queue_events',
+  // Last: a photograph points at a wound, and is by far the largest row.
+  'clinical_photos',
 ]
 
 /** Suffix marking a translated foreign key in a transmitted row. */

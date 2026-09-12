@@ -16,6 +16,7 @@ import { getSetting, setSetting } from '../db/repo/settings'
 import { SETTING_KEYS } from '../core/constants'
 import { saveFile, readFileBytes, formatBytes } from './fileIo'
 import { migrate } from '../db/migrations'
+import { uploadBackup } from './cloudBackup'
 
 const COUNTED_TABLES = [
   'participants',
@@ -65,6 +66,13 @@ export interface BackupResult {
   method: 'picker' | 'download' | 'native' | 'desktop'
   /** Where the file landed, for the confirmation message. */
   location?: string
+  /** Set when a copy was also sent off the device. */
+  cloud?: { uploaded: boolean; error?: string }
+}
+
+/** Whether a copy of each backup should also go to the cloud. */
+export function cloudBackupEnabled(): boolean {
+  return getSetting('backup.cloud_enabled') === 'true'
 }
 
 /**
@@ -75,6 +83,7 @@ export async function createBackup(
   passphrase: string,
   kind: 'MANUAL' | 'PRE_RESTORE' | 'CLOSURE' = 'MANUAL',
   notes?: string,
+  options: { toCloud?: boolean } = {},
 ): Promise<BackupResult> {
   if (!passphrase || passphrase.length < 8) {
     throw new Error('The backup password must be at least 8 characters.')
@@ -123,13 +132,46 @@ export async function createBackup(
     })
   })
 
+  // The off-site copy is attempted last and never allowed to fail the
+  // backup: the file on this device is already written and already valid,
+  // and losing that to a dropped connection would be absurd.
+  let cloud: BackupResult['cloud']
+  if (options.toCloud ?? cloudBackupEnabled()) {
+    try {
+      await uploadBackup(sealed, {
+        filename: outcome.name,
+        checksum,
+        createdBy: auditActor().username,
+        recordCounts: counts,
+      })
+      await transaction(() => {
+        setSetting('backup.cloud_last_at', nowIso())
+        audit({
+          action: AUDIT_ACTIONS.BACKUP_CREATE,
+          entityType: 'backup',
+          entityId: outcome.name,
+          summary: `Encrypted backup copied to the cloud (${formatBytes(sealed.byteLength)})`,
+        })
+      })
+      cloud = { uploaded: true }
+    } catch (err) {
+      cloud = { uploaded: false, error: (err as Error).message }
+    }
+  }
+
   return {
     filename: outcome.name,
     sizeBytes: sealed.byteLength,
     checksum,
     method: outcome.method,
     location: outcome.location,
+    cloud,
   }
+}
+
+/** When the most recent off-site copy was taken. */
+export function lastCloudBackupAt(): string | null {
+  return getSetting('backup.cloud_last_at')
 }
 
 export interface RestorePreview {
@@ -149,10 +191,14 @@ export function inspectBackupFile(bytes: Uint8Array): RestorePreview {
  * that and is wired into the restore screen.
  */
 export async function restoreBackup(
-  file: File,
+  /** A file the administrator chose, or bytes already fetched from the cloud. */
+  source: File | Uint8Array,
   passphrase: string | null,
+  sourceName?: string,
 ): Promise<{ counts: Record<string, number> }> {
-  const raw = await readFileBytes(file)
+  const name =
+    sourceName ?? (source instanceof Uint8Array ? 'a backup from the cloud' : source.name)
+  const raw = source instanceof Uint8Array ? source : await readFileBytes(source)
   const preview = inspectBackupFile(raw)
 
   let plain: Uint8Array
@@ -174,8 +220,8 @@ export async function restoreBackup(
     audit({
       action: AUDIT_ACTIONS.BACKUP_RESTORE,
       entityType: 'backup',
-      entityId: file.name,
-      summary: `Database restored from ${file.name}`,
+      entityId: name,
+      summary: `Database restored from ${name}`,
       newValue: counts,
     })
   })

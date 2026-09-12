@@ -30,6 +30,7 @@ export const SYNCED_TABLES = [
   'followups', 'queue_events', 'suppliers', 'budget_categories', 'budget_items',
   'expenses', 'inventory_items', 'inventory_transactions', 'procurement',
   'mobilisation_activities', 'logistics_items', 'event_checklists',
+  'clinical_photos',
 ]
 
 export const FOREIGN_KEY_COLUMNS = {
@@ -61,6 +62,7 @@ export const FOREIGN_KEY_COLUMNS = {
   mobilisation_activities: ['project_id'],
   logistics_items: ['project_id'],
   event_checklists: ['project_id'],
+  clinical_photos: ['participant_id', 'project_id', 'wound_id'],
 }
 
 export const CHANGE_LOG = `
@@ -96,6 +98,35 @@ CREATE TABLE IF NOT EXISTS auth_attempts (
   username     TEXT PRIMARY KEY,
   failures     INTEGER NOT NULL DEFAULT 0,
   locked_until TEXT
+);
+
+-- Optional off-site copy of the encrypted backup file.
+--
+-- The bytes arriving here are already sealed with AES-256-GCM under a
+-- passphrase the server never sees, so this table holds ciphertext and
+-- nothing else: losing the database would not expose one record. The file is
+-- split into chunks because a whole backup is far larger than one request.
+CREATE TABLE IF NOT EXISTS cloud_backups (
+  uuid        TEXT PRIMARY KEY,
+  device_id   TEXT NOT NULL,
+  filename    TEXT NOT NULL,
+  created_at  TEXT NOT NULL,
+  size_bytes  INTEGER NOT NULL,
+  checksum    TEXT,
+  chunk_count INTEGER NOT NULL,
+  chunks_in   INTEGER NOT NULL DEFAULT 0,
+  complete    INTEGER NOT NULL DEFAULT 0,
+  created_by  TEXT,
+  record_counts TEXT,
+  received_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_cloud_backups_device ON cloud_backups(device_id, created_at);
+
+CREATE TABLE IF NOT EXISTS cloud_backup_chunks (
+  backup_uuid TEXT NOT NULL,
+  seq         INTEGER NOT NULL,
+  data        TEXT NOT NULL,
+  PRIMARY KEY (backup_uuid, seq)
 );
 `
 

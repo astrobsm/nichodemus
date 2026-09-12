@@ -693,3 +693,53 @@ table.data td.num, table.data th.num { text-align: right; font-variant-numeric: 
 @media (prefers-reduced-motion: no-preference) {
   .list-item, .btn, .choice { transition: background-color 0.12s ease; }
 }
+
+/* ---------------------------------------------------------------- photos */
+/* Square tiles: a wound photograph is read by comparing one visit with the
+   next, so a consistent crop matters more than showing the whole frame. */
+.photo-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+.photo-tile {
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--surface);
+  text-align: left;
+  cursor: pointer;
+  min-height: 44px;
+}
+.photo-tile img {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  display: block;
+}
+.photo-missing {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  display: block;
+  background: repeating-linear-gradient(
+    45deg,
+    var(--line) 0 8px,
+    transparent 8px 16px
+  );
+}
+.photo-meta {
+  display: block;
+  padding: 8px 10px;
+  font-size: 13px;
+  font-weight: 700;
+}
+.photo-meta .secondary {
+  display: block;
+  font-weight: 400;
+  color: var(--muted);
+  font-size: 12px;
+}

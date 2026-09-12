@@ -70,6 +70,7 @@ export const SYNCABLE_TABLES = [
   'mobilisation_activities',
   'logistics_items',
   'event_checklists',
+  'clinical_photos',
 ] as const
 
 const SYNCABLE = new Set<string>(SYNCABLE_TABLES)
@@ -85,6 +86,10 @@ const SYNCABLE = new Set<string>(SYNCABLE_TABLES)
 function markChanged(table: string, rowUuid: unknown): void {
   if (!SYNCABLE.has(table)) return
   if (typeof rowUuid !== 'string' || rowUuid === '') return
+  // Clinical photographs are the one record type that stays on the device
+  // that took it unless an administrator decides otherwise. Not queueing them
+  // is what makes that true, rather than merely stated.
+  if (table === 'clinical_photos' && !photoSyncEnabled()) return
   try {
     run(
       `INSERT INTO sync_outbox (table_name, row_uuid, changed_at) VALUES (?, ?, ?)
@@ -95,6 +100,41 @@ function markChanged(table: string, rowUuid: unknown): void {
     // A database created before migration 003 has no outbox yet. Never let
     // sync bookkeeping break a clinical write.
   }
+}
+
+/**
+ * Whether photographs take part in synchronisation.
+ *
+ * Read straight from app_settings rather than through the settings repository,
+ * because that module imports this one.
+ */
+export function photoSyncEnabled(): boolean {
+  try {
+    const row = queryOne<{ value: string | null }>(
+      "SELECT value FROM app_settings WHERE key = 'photos.sync_enabled'",
+    )
+    return row?.value === 'true'
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Queues every photograph currently on this device, for when an administrator
+ * turns photograph synchronisation on after images have already been taken.
+ */
+export function enqueueAllPhotos(): number {
+  const rows = query<{ uuid: string }>(
+    'SELECT uuid FROM clinical_photos WHERE deleted_at IS NULL',
+  )
+  for (const row of rows) {
+    run(
+      `INSERT INTO sync_outbox (table_name, row_uuid, changed_at) VALUES ('clinical_photos', ?, ?)
+       ON CONFLICT(table_name, row_uuid) DO UPDATE SET changed_at = excluded.changed_at`,
+      [row.uuid, nowIso()],
+    )
+  }
+  return rows.length
 }
 
 /** Looks up a row's uuid when the caller did not supply one. */
@@ -150,7 +190,7 @@ export function undelete(table: string, id: number): number {
  * other edit: version is how two devices decide whose change is newer, and a
  * deletion that left it unchanged could lose to the very row it deletes.
  */
-function currentVersion(table: string, id: number): number {
+export function currentVersion(table: string, id: number): number {
   try {
     const row = queryOne<{ version: number }>(`SELECT version FROM ${table} WHERE id = ?`, [id])
     return Number(row?.version ?? 0)

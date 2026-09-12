@@ -5,6 +5,7 @@
  */
 import baselineSql from './schema.sql?raw'
 import syncSql from './migrations-sync.sql?raw'
+import photosSql from './migrations-photos.sql?raw'
 import { exec, query, run, transactionSync, handle } from './sqlite'
 import { nowIso } from '../core/datetime'
 import { uuid } from '../core/ids'
@@ -85,6 +86,13 @@ export const MIGRATIONS: Migration[] = [
     name: 'synchronisation outbox and run history',
     up: () => {
       exec(syncSql)
+    },
+  },
+  {
+    version: 4,
+    name: 'clinical photographs',
+    up: () => {
+      exec(photosSql)
     },
   },
 ]

@@ -12,6 +12,8 @@
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { createClient, type Client } from '@libsql/client'
+// @ts-expect-error - plain JS build script, no type declarations
+import { SYNCED_TABLES } from '../scripts/cloud-schema.mjs'
 
 const LIVE = process.env.CLOUD_VERIFY === '1'
 const TEST_UUID = 'verify-0000-0000-0000-000000000000'
@@ -81,15 +83,10 @@ describe.skipIf(!LIVE)('the live cloud database', () => {
     console.log('    test record removed')
   })
 
-  it('has all 28 synchronised tables', async () => {
-    const expected = [
-      'projects', 'stations', 'team_members', 'attendance', 'tasks', 'users',
-      'participants', 'consents', 'vitals', 'glucose_results', 'clinical_encounters',
-      'wounds', 'wound_assessments', 'breast_examinations', 'facilities', 'referrals',
-      'followups', 'queue_events', 'suppliers', 'budget_categories', 'budget_items',
-      'expenses', 'inventory_items', 'inventory_transactions', 'procurement',
-      'mobilisation_activities', 'logistics_items', 'event_checklists',
-    ]
+  it('has every synchronised table', async () => {
+    // Taken from the generator rather than retyped, so adding a table cannot
+    // leave this test quietly checking the old list.
+    const expected = SYNCED_TABLES as string[]
     const result = await client.execute("SELECT name FROM sqlite_master WHERE type = 'table'")
     const present = new Set(result.rows.map((r) => String(r.name)))
     const missing = expected.filter((t) => !present.has(t))

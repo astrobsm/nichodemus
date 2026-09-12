@@ -892,3 +892,51 @@ CREATE TABLE IF NOT EXISTS backups (
   notes         TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_backups_time ON backups(created_at);
+
+-- ---------------------------------------------------------------------------
+-- Clinical photographs (spec S31).
+--
+-- A photograph of a wound or a breast lesion is identifiable patient data of
+-- the most sensitive kind, so three rules are enforced in code rather than
+-- left to habit:
+--
+--   1. Nothing is captured without a recorded PHOTOGRAPHY consent for that
+--      participant. Consent for care is not consent to be photographed.
+--   2. The image is stored inside the local database, never in the device
+--      gallery, so it leaves with an encrypted backup and with nothing else.
+--   3. It is not synchronised unless an administrator turns that on. A
+--      photograph is the one record whose default is that it never leaves
+--      the device that took it.
+--
+-- The image itself is a downscaled JPEG held as base64 in image_data.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS clinical_photos (
+  id             INTEGER PRIMARY KEY AUTOINCREMENT,
+  uuid           TEXT NOT NULL UNIQUE,
+  participant_id INTEGER NOT NULL REFERENCES participants(id),
+  project_id     INTEGER NOT NULL REFERENCES projects(id),
+  wound_id       INTEGER REFERENCES wounds(id),
+  context        TEXT NOT NULL DEFAULT 'WOUND',
+  body_site      TEXT,
+  caption        TEXT,
+  captured_at    TEXT NOT NULL,
+  captured_by    TEXT,
+  consent_uuid   TEXT,
+  mime_type      TEXT NOT NULL DEFAULT 'image/jpeg',
+  width          INTEGER,
+  height         INTEGER,
+  size_bytes     INTEGER,
+  checksum       TEXT,
+  image_data     TEXT NOT NULL,
+  is_demo        INTEGER NOT NULL DEFAULT 0,
+  created_at     TEXT NOT NULL,
+  updated_at     TEXT NOT NULL,
+  device_id      TEXT,
+  created_by     TEXT,
+  updated_by     TEXT,
+  version        INTEGER NOT NULL DEFAULT 1,
+  deleted_at     TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_photos_participant ON clinical_photos(participant_id);
+CREATE INDEX IF NOT EXISTS idx_photos_wound ON clinical_photos(wound_id);
+CREATE INDEX IF NOT EXISTS idx_photos_project ON clinical_photos(project_id);

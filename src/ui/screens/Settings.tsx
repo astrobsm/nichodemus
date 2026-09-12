@@ -48,7 +48,22 @@ import {
 } from '../../db/repo/users'
 import { deleteFacility, listFacilities, saveFacility, type Facility } from '../../db/repo/referrals'
 import { listAudit, distinctAuditActions, auditCount } from '../../core/audit'
-import { backupStatus, createBackup, listBackups, restoreBackup } from '../../services/backup'
+import {
+  backupStatus,
+  cloudBackupEnabled,
+  createBackup,
+  lastCloudBackupAt,
+  listBackups,
+  restoreBackup,
+} from '../../services/backup'
+import { cloudSignIn, defaultEndpoint } from '../../services/cloudAuth'
+import { enqueueAllPhotos, photoSyncEnabled } from '../../db/repo/base'
+import { photoBytes, photoCount } from '../../db/repo/photos'
+import {
+  downloadCloudBackup,
+  listCloudBackups,
+  type CloudBackupEntry,
+} from '../../services/cloudBackup'
 import {
   isSyncConfigured,
   recentSyncRuns,
@@ -61,7 +76,7 @@ import { SERIAL_BLOCK_SIZE, serialRange } from '../../core/constants'
 import { deviceId } from '../../core/ids'
 import { clearDemoData, demoRecordCount, generateDemoData } from '../../services/demoData'
 import { pickFile, formatBytes, saveLocationLabel } from '../../services/fileIo'
-import { integrityCheck, foreignKeyCheck, flush } from '../../db/sqlite'
+import { integrityCheck, foreignKeyCheck, flush, transaction } from '../../db/sqlite'
 import { currentSchemaVersion } from '../../db/migrations'
 import { storageInfo } from '../../db/persistence'
 import { ROLE_DEFINITIONS, PERMISSIONS, roleName, type RoleCode } from '../../core/permissions'
@@ -784,6 +799,129 @@ function FacilityForm({
 
 // -------------------------------------------------------------- backup
 
+/**
+ * The off-site copy.
+ *
+ * A backup on the phone that took it survives a corrupted database. It does
+ * not survive the phone being lost, stolen or dropped in water, which on a
+ * field outreach is the likelier of the two.
+ */
+function CloudBackupCard() {
+  const { can, refresh, reloadProject } = useApp()
+  const toast = useToast()
+  const enabled = useQuery(() => cloudBackupEnabled(), [])
+  const lastAt = useQuery(() => lastCloudBackupAt(), [])
+  const configured = useQuery(() => isSyncConfigured(), [])
+
+  const [remote, setRemote] = useState<CloudBackupEntry[] | null>(null)
+  const [busy, setBusy] = useState('')
+  const [restoring, setRestoring] = useState<CloudBackupEntry | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  async function loadList() {
+    setBusy('Looking for backups in the cloud…')
+    setError(null)
+    try {
+      setRemote(await listCloudBackups())
+    } catch (err) {
+      setError(friendlyError(err, 'The list could not be fetched.'))
+    } finally {
+      setBusy('')
+    }
+  }
+
+  if (!configured) {
+    return (
+      <Card title="Off-site copy">
+        <AlertBox tone="muted" title="Not available yet">
+          This device is not connected to the cloud. Set the web address under Cloud sync first;
+          then every backup can also be kept off the device.
+        </AlertBox>
+      </Card>
+    )
+  }
+
+  return (
+    <>
+      <Card title="Off-site copy">
+        <Toggle
+          label="Also keep each backup in the cloud"
+          checked={enabled}
+          onChange={(v) => {
+            void transaction(() => setSetting('backup.cloud_enabled', v ? 'true' : 'false'))
+            refresh()
+          }}
+          help="The file is encrypted on this device before it is sent. The server never sees the password and cannot open it."
+        />
+        <KeyValue k="Last cloud copy" v={lastAt ? relativeDateTime(lastAt) : 'Never'} />
+
+        <AlertBox tone="warn" title="The password is the whole protection">
+          A cloud copy nobody can decrypt is not a backup. Write the backup password down and keep
+          it somewhere other than the phone — there is no way to recover it.
+        </AlertBox>
+
+        <button className="btn block secondary" onClick={() => void loadList()} disabled={!!busy}>
+          {busy || 'Show backups in the cloud'}
+        </button>
+        {error ? <AlertBox tone="danger" title="Could not reach the cloud">{error}</AlertBox> : null}
+      </Card>
+
+      {remote ? (
+        <Card title={`In the cloud (${remote.length})`}>
+          {remote.length === 0 ? (
+            <p className="hint" style={{ marginTop: 0 }}>
+              No backups have been uploaded yet. Turn the setting above on and take a backup.
+            </p>
+          ) : (
+            remote.map((b) => (
+              <div key={b.uuid} className="list-item" style={{ cursor: 'default' }}>
+                <span className="grow">
+                  <span className="primary">{formatDateTime(b.createdAt)}</span>
+                  <span className="secondary">
+                    {formatBytes(b.sizeBytes)} · from device {b.deviceId.slice(0, 8)}
+                    {b.createdBy ? ` · ${b.createdBy}` : ''}
+                  </span>
+                </span>
+                {can(PERMISSIONS.BACKUP_RESTORE) ? (
+                  <button className="btn small secondary" onClick={() => setRestoring(b)}>
+                    Restore
+                  </button>
+                ) : null}
+              </div>
+            ))
+          )}
+        </Card>
+      ) : null}
+
+      {restoring ? (
+        <Modal title="Restore from the cloud" onClose={() => setRestoring(null)}>
+          <AlertBox tone="danger" title="This replaces everything on this device">
+            Every record currently on this device is replaced by the contents of that backup.
+            Anything registered since it was taken and not yet synchronised will be lost.
+          </AlertBox>
+          <PassphrasePrompt
+            description={`Enter the password used when that backup was made on ${formatDateTime(
+              restoring.createdAt,
+            )}.`}
+            confirmLabel="Download and restore"
+            onCancel={() => setRestoring(null)}
+            onSubmit={async (pass) => {
+              const bytes = await downloadCloudBackup(restoring)
+              await restoreBackup(bytes, pass, restoring.filename)
+              await flush()
+              await reloadProject()
+              refresh()
+              toast('ok', 'The database was restored from the cloud copy.')
+              setRestoring(null)
+            }}
+          />
+        </Modal>
+      ) : null}
+    </>
+  )
+}
+
+
 function BackupSettings() {
   const { can, refresh, reloadProject } = useApp()
   const toast = useToast()
@@ -839,6 +977,8 @@ function BackupSettings() {
         </>
       ) : null}
 
+      <CloudBackupCard />
+
       {history.length ? (
         <Card title="Backups made from this device">
           {history.map((b) => (
@@ -864,11 +1004,22 @@ function BackupSettings() {
             onCancel={() => setCreating(false)}
             onSubmit={async (pass) => {
               const r = await createBackup(pass, 'MANUAL')
-              toast(
-                'ok',
-                `Backup saved as ${r.filename} (${formatBytes(r.sizeBytes)})` +
-                  (r.location ? ` in ${r.location}.` : '.'),
-              )
+              const where = r.location ? ` in ${r.location}.` : '.'
+              if (r.cloud?.uploaded) {
+                toast(
+                  'ok',
+                  `Backup saved as ${r.filename} (${formatBytes(r.sizeBytes)})${where} A copy is also in the cloud.`,
+                )
+              } else if (r.cloud) {
+                // The file on this device is written and valid; only the
+                // off-site copy failed, and saying so plainly matters.
+                toast(
+                  'warn',
+                  `Backup saved on this device as ${r.filename}, but the cloud copy failed: ${r.cloud.error}`,
+                )
+              } else {
+                toast('ok', `Backup saved as ${r.filename} (${formatBytes(r.sizeBytes)})${where}`)
+              }
               refresh()
               setCreating(false)
             }}
@@ -998,6 +1149,71 @@ function SecuritySettings() {
 
 // ---------------------------------------------------------- cloud sync
 
+/**
+ * Connecting an already-running device to the cloud.
+ *
+ * The device key is a shared secret. Typing a 32-character secret onto a
+ * phone keyboard, from a note somebody read out, is how secrets end up
+ * written on the back of the phone. Signing in fetches it instead — the same
+ * exchange a new device makes — and reserves this device its own
+ * participant-number block at the same time.
+ */
+function ConnectToCloud({ endpoint, onConnected }: { endpoint: string; onConnected: () => void }) {
+  const toast = useToast()
+  const [username, setUsername] = useState('')
+  const [pin, setPin] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function connect() {
+    setBusy(true)
+    setError(null)
+    try {
+      const credentials = await cloudSignIn(endpoint, username, pin, deviceId())
+      await transaction(() => {
+        saveSyncConfig({
+          endpoint: endpoint.trim(),
+          token: credentials.syncToken,
+          serialBlock: credentials.serialBlock,
+          enabled: true,
+        })
+      })
+      toast('ok', `Connected as ${credentials.user.fullName}. This device is ready to sync.`)
+      onConnected()
+    } catch (err) {
+      setError(friendlyError(err, 'This device could not be connected.'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <>
+      <TextField label="Your username" value={username} onChange={setUsername} autoFocus />
+      <TextField
+        label="Your PIN"
+        value={pin}
+        onChange={setPin}
+        type="password"
+        inputMode="numeric"
+        maxLength={12}
+      />
+      {error ? <AlertBox tone="danger" title="Could not connect">{error}</AlertBox> : null}
+      <button
+        className="btn block large"
+        onClick={() => void connect()}
+        disabled={busy || !username.trim() || !pin}
+      >
+        {busy ? 'Connecting…' : 'Connect this device'}
+      </button>
+      <p className="hint">
+        Your account is checked against the outreach in the cloud. The device key and this device’s
+        participant-number block arrive with the answer — there is nothing to type in by hand.
+      </p>
+    </>
+  )
+}
+
 function SyncSettings() {
   const { refresh, online } = useApp()
   const toast = useToast()
@@ -1005,11 +1221,14 @@ function SyncSettings() {
   const status = useQuery(() => syncStatus(), [])
   const runs = useQuery(() => recentSyncRuns(8), [])
 
-  const [endpoint, setEndpoint] = useState(config.endpoint)
+  const [endpoint, setEndpoint] = useState(config.endpoint || defaultEndpoint())
   const [token, setToken] = useState(config.token)
   const [block, setBlock] = useState(String(config.serialBlock))
   const [busy, setBusy] = useState(false)
   const [clash, setClash] = useState(false)
+  const [manualKey, setManualKey] = useState(false)
+  const photoSync = useQuery(() => photoSyncEnabled(), [])
+  const photoStats = useQuery(() => ({ count: photoCount(), bytes: photoBytes() }), [])
 
   const range = serialRange(Number(block) || 0)
 
@@ -1086,8 +1305,35 @@ function SyncSettings() {
           label="Number block"
           value={block}
           onChange={setBlock}
-          help={`Give every device a different block. Block 0 issues numbers 1 to ${SERIAL_BLOCK_SIZE.toLocaleString()}, block 1 continues from ${(SERIAL_BLOCK_SIZE + 1).toLocaleString()}, and so on. Two devices sharing a block would issue the same participant number to different people.`}
+          help={`Reserved for this device by the cloud when it signed in — you do not normally set this. Block 0 issues numbers 1 to ${SERIAL_BLOCK_SIZE.toLocaleString()}, block 1 continues from ${(SERIAL_BLOCK_SIZE + 1).toLocaleString()}, and so on. Two devices sharing a block would issue the same participant number to different people.`}
         />
+      </Card>
+
+      <Card title="Clinical photographs">
+        <Toggle
+          label="Include photographs in synchronisation"
+          checked={photoSync}
+          onChange={(v) => {
+            void transaction(() => {
+              setSetting('photos.sync_enabled', v ? 'true' : 'false')
+              // Images taken while this was off were never queued, so turning
+              // it on has to go back for them.
+              if (v) enqueueAllPhotos()
+            })
+            refresh()
+          }}
+          help="Off by default. A photograph identifies a person more surely than a name does, so it stays on the device that took it until you decide otherwise."
+        />
+        <KeyValue
+          k="On this device"
+          v={`${photoStats.count} photograph${photoStats.count === 1 ? '' : 's'}, ${formatBytes(photoStats.bytes)}`}
+        />
+        {photoSync ? (
+          <AlertBox tone="warn" title="Photographs will be uploaded">
+            They travel to the same cloud database as the clinical records and count against its
+            storage. Expect roughly {formatBytes(300 * 1024)} for each image.
+          </AlertBox>
+        ) : null}
       </Card>
 
       <Card title="Cloud address">
@@ -1095,19 +1341,59 @@ function SyncSettings() {
           label="Web address"
           value={endpoint}
           onChange={setEndpoint}
-          placeholder="https://your-project.vercel.app"
+          placeholder={defaultEndpoint() || 'https://your-project.vercel.app'}
           help="The address of the hosted application. Leave blank to keep this device entirely offline."
         />
-        <TextField
-          label="Device key"
-          value={token}
-          onChange={setToken}
-          type="password"
-          help="The SYNC_TOKEN set on the server. The same value goes into every device."
-        />
-        <button className="btn block" onClick={save}>
-          Save cloud settings
-        </button>
+
+        {token ? (
+          <>
+            <TextField
+              label="Device key"
+              value={token}
+              onChange={setToken}
+              type="password"
+              help="Fetched when this device signed in. Change it only if an administrator gives you a new one."
+            />
+            <button className="btn block" onClick={save}>
+              Save cloud settings
+            </button>
+          </>
+        ) : (
+          <>
+            <AlertBox tone="info" title="Sign in to connect this device">
+              This device has no key yet. Rather than typing a long secret, sign in with your own
+              username and PIN: the key and this device’s participant-number block come back with
+              the answer.
+            </AlertBox>
+            <ConnectToCloud
+              endpoint={endpoint || defaultEndpoint()}
+              onConnected={() => {
+                setToken(syncConfig().token)
+                setBlock(String(syncConfig().serialBlock))
+                setEndpoint(syncConfig().endpoint)
+                refresh()
+              }}
+            />
+            {manualKey ? (
+              <>
+                <TextField
+                  label="Device key"
+                  value={token}
+                  onChange={setToken}
+                  type="password"
+                  help="The SYNC_TOKEN set on the server."
+                />
+                <button className="btn block secondary" onClick={save}>
+                  Save cloud settings
+                </button>
+              </>
+            ) : (
+              <button className="btn block ghost" onClick={() => setManualKey(true)}>
+                Enter the device key by hand instead
+              </button>
+            )}
+          </>
+        )}
       </Card>
 
       {isSyncConfigured() ? (
@@ -1386,19 +1672,28 @@ function AboutSettings() {
         ) : null}
       </Card>
 
-      <Card title="Not yet implemented">
-        <p className="hint" style={{ marginTop: 0 }}>
-          These are designed for in the database but deliberately not built in version 1:
-        </p>
-        <div className="not-implemented">NOT IMPLEMENTED — clinical photography capture</div>
-        <div style={{ height: 8 }} />
-        <div className="not-implemented">NOT IMPLEMENTED — device-to-device synchronisation</div>
-        <div style={{ height: 8 }} />
-        <div className="not-implemented">NOT IMPLEMENTED — optional cloud backup</div>
+      <Card title="What this version does">
+        <KeyValue k="Clinical photography" v={<Badge tone="ok">Built</Badge>} />
+        <KeyValue k="Synchronisation between devices" v={<Badge tone="ok">Built</Badge>} />
+        <KeyValue k="Off-site backup" v={<Badge tone="ok">Built</Badge>} />
         <p className="hint">
-          Every record already carries a UUID, timestamps, a device identifier and a version number
-          so that synchronisation can be added later without changing the database.
+          Photographs need a separate photography consent and stay on the device that took them
+          unless an administrator turns synchronisation on for them. Records are matched between
+          devices on their UUID, and the off-site backup copy is encrypted here before it is sent,
+          so the server holds ciphertext it cannot open.
         </p>
+      </Card>
+
+      <Card title="Not built in version 1">
+        <p className="hint" style={{ marginTop: 0 }}>
+          Designed for in the database, deliberately left out. They are named here so nobody plans
+          the outreach around a feature that does not exist:
+        </p>
+        <div className="not-implemented">NOT IMPLEMENTED — SMS reminders to participants</div>
+        <div style={{ height: 8 }} />
+        <div className="not-implemented">NOT IMPLEMENTED — printing to a Bluetooth label printer</div>
+        <div style={{ height: 8 }} />
+        <div className="not-implemented">NOT IMPLEMENTED — a second language for the interface</div>
       </Card>
     </>
   )

@@ -33,20 +33,35 @@ export class CloudAuthError extends Error {
 }
 
 /**
+ * The address this build was compiled with, if any.
+ *
+ * The Android and desktop builds run from private schemes and cannot work out
+ * where the outreach lives, so the address is baked in at build time (.env,
+ * VITE_CLOUD_ENDPOINT). Without it every nurse installing the application
+ * would have to be told a URL to type on a phone keyboard, which is exactly
+ * the kind of step that does not survive a field day.
+ */
+export function builtInEndpoint(): string {
+  const configured = import.meta.env.VITE_CLOUD_ENDPOINT
+  return typeof configured === 'string' ? configured.trim().replace(/\/+$/, '') : ''
+}
+
+/**
  * Where this build should look for the outreach by default.
  *
  * The hosted web application is served from the same origin as the API, so it
- * can find it without being told. The Android and desktop builds run from
- * private schemes (https://localhost and app://local), which are not the
- * cloud, so those ask for the address once.
+ * can find it without being told. The packaged builds fall back to the
+ * address compiled into them.
  */
 export function defaultEndpoint(): string {
-  if (typeof window === 'undefined') return ''
+  if (typeof window === 'undefined') return builtInEndpoint()
   const { origin, protocol, hostname } = window.location
-  if (protocol !== 'https:' && protocol !== 'http:') return ''
+  if (protocol !== 'https:' && protocol !== 'http:') return builtInEndpoint()
   if (hostname === 'localhost' || hostname === '127.0.0.1') {
-    // A local dev server has no API beside it unless it is the real one.
-    return import.meta.env.DEV ? '' : origin
+    // The Android build is served from https://localhost by Capacitor, and a
+    // developer's dev server is served from http://localhost. Neither has an
+    // API beside it, so both use the address this build carries.
+    return builtInEndpoint()
   }
   return origin
 }

@@ -45,8 +45,19 @@ import {
   WoundForm,
 } from './ClinicalForms'
 import { ConsentPanel } from './Participants'
+import { PhotographsTab } from './Photographs'
+import { photosFor } from '../../db/repo/photos'
 
-type Tab = 'PROFILE' | 'SCREENING' | 'CLINICAL' | 'WOUND' | 'BREAST' | 'REFERRAL' | 'FOLLOWUP' | 'HISTORY'
+type Tab =
+  | 'PROFILE'
+  | 'SCREENING'
+  | 'CLINICAL'
+  | 'WOUND'
+  | 'BREAST'
+  | 'PHOTOS'
+  | 'REFERRAL'
+  | 'FOLLOWUP'
+  | 'HISTORY'
 
 type FormKind = 'VITALS' | 'GLUCOSE' | 'CONSULT' | 'WOUND' | 'BREAST' | 'REFERRAL' | 'CONSENT' | null
 
@@ -56,6 +67,7 @@ export function ParticipantProfile({ id }: { id: number }) {
   const progress = useQuery(() => (participant ? participantProgress(id) : null), [id])
   const [tab, setTab] = useState<Tab>('PROFILE')
   const [form, setForm] = useState<FormKind>(null)
+  const photos = useQuery(() => photosFor(id), [id])
 
   if (!participant) {
     return (
@@ -154,6 +166,9 @@ export function ParticipantProfile({ id }: { id: number }) {
           { key: 'CLINICAL', label: 'Clinical', badge: progress?.clinical },
           { key: 'WOUND', label: 'Wound', badge: progress?.wounds },
           { key: 'BREAST', label: 'Breast', badge: progress?.breast },
+          ...(can(PERMISSIONS.PHOTO_VIEW)
+            ? [{ key: 'PHOTOS', label: 'Photographs', badge: photos.length }]
+            : []),
           { key: 'REFERRAL', label: 'Referral', badge: progress?.referrals },
           { key: 'FOLLOWUP', label: 'Follow-up', badge: progress?.followupsPending },
           { key: 'HISTORY', label: 'History' },
@@ -165,6 +180,9 @@ export function ParticipantProfile({ id }: { id: number }) {
       {tab === 'CLINICAL' ? <ClinicalTab id={id} /> : null}
       {tab === 'WOUND' ? <WoundTab id={id} /> : null}
       {tab === 'BREAST' ? <BreastTab id={id} /> : null}
+      {tab === 'PHOTOS' ? (
+        <PhotographsTab participantId={id} projectId={participant.project_id} />
+      ) : null}
       {tab === 'REFERRAL' ? <ReferralTab id={id} /> : null}
       {tab === 'FOLLOWUP' ? <FollowupTab id={id} /> : null}
       {tab === 'HISTORY' ? <HistoryTab id={id} /> : null}
