@@ -6,5 +6,5 @@
  */
 
 export const APP_VERSION = '1.0.0'
-export const APP_BUILD = '36ab9cb69'
-export const BUILT_AT = '2026-09-12T19:24:20.000Z'
+export const APP_BUILD = '89de67cbd'
+export const BUILT_AT = '2026-09-12T19:28:11.000Z'

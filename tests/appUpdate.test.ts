@@ -49,6 +49,12 @@ describe('the service worker can be told apart between deployments', () => {
     expect(source).toContain("k.startsWith('nug-outreach-') && k !== CACHE")
   })
 
+  it('answers "which build are you?" on the port it was asked through', () => {
+    // event.source is null for a message sent over a MessageChannel, so a
+    // worker that replies only to it answers nobody.
+    expect(source).toContain('event.ports[0].postMessage(reply)')
+  })
+
   it('never caches the API', () => {
     // A cached sign-in or version answer is worse than no answer.
     expect(source).toContain("url.pathname.startsWith('/api/')")

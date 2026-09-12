@@ -66,8 +66,14 @@ self.addEventListener('message', (event) => {
   // The page has decided it is safe to swap - nothing unsaved on screen.
   if (data.type === 'SKIP_WAITING') self.skipWaiting()
 
-  if (data.type === 'BUILD?' && event.source) {
-    event.source.postMessage({ type: 'BUILD', build: BUILD })
+  // Which build is actually in charge of this page. Answered on the port the
+  // asker supplied when there is one - event.source is null for a message
+  // sent through a MessageChannel, so replying only to it would answer
+  // nothing at all.
+  if (data.type === 'BUILD?') {
+    const reply = { type: 'BUILD', build: BUILD }
+    if (event.ports && event.ports[0]) event.ports[0].postMessage(reply)
+    else if (event.source) event.source.postMessage(reply)
   }
 })
 
