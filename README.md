@@ -81,7 +81,7 @@ Full walkthrough: **[docs/CLOUD.md](docs/CLOUD.md)**.
 ```bash
 npm run dev        # http://localhost:5173
 npm run build      # dist/ — the web application, ~2 MB
-npm test           # 216 tests against a real SQLite database
+npm test           # 217 tests against a real SQLite database
 npm run typecheck
 ```
 
@@ -158,9 +158,9 @@ tests/cloudSchema.test.ts     8  the generated cloud schema accepts every table
 tests/cloudAuth.test.ts      20  cloud sign-in, lockout, CORS, block allocation
 tests/photos.test.ts         19  photography consent, erasure, staying on device
 tests/cloudBackup.test.ts    17  chunked off-site backup, pruning, ciphertext only
-tests/appUpdate.test.ts      21  build stamping, the update check, what it reports
+tests/appUpdate.test.ts      22  build stamping, the update check, what it reports
                             ───
-                            216  all passing
+                            217  all passing
 ```
 
 The suites run against a real SQLite database, not a mock.
@@ -190,6 +190,13 @@ photography consent was recorded; withdrawing that consent erased the image
 rather than hiding it; and photographs were confirmed to be excluded from
 synchronisation by default. A 700 KB encrypted file was uploaded in three
 parts, listed, fetched back and compared byte for byte against what was sent.
+
+Automatic updating was verified across two real production deployments with
+the application left open in between: a copy running build A showed no
+banner; a new build B was deployed; the running copy noticed it, offered it,
+and — importantly — did **not** swap the code underneath until the update was
+accepted; after accepting, the same page was running build B and the banner
+was gone.
 
 The Android build was verified by deleting `android/` and running `npm run apk`
 from scratch: 1m46s, package `org.nugoutreach.app`, labelled **NUG Outreach**,

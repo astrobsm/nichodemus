@@ -238,6 +238,48 @@ the password that backup was made with.
 
 ---
 
+## 5b. Publishing an update
+
+```bash
+npm run release
+```
+
+One command, from a clean checkout. It builds the web application, the
+Android package and the desktop installer **from the same commit**, deploys
+the web application and publishes the packaged builds.
+
+The build identity is the commit — not a timestamp. That matters: the three
+builds are produced by three different commands, and if the identity moved
+with the clock they would never match, so every device would compare itself
+against a deployment it could not equal and offer an update that changes
+nothing, for ever. The script refuses to run with uncommitted changes, and
+stops if the service worker was not stamped with the current build.
+
+| Copy | How it updates |
+| --- | --- |
+| Browser, and added-to-home-screen | Downloads in the background; a bar offers **Update now**. Re-checks every half hour and on focus. |
+| Desktop | Checks at startup and daily, downloads in the background, installs when the application is next closed. |
+| Android | Notices within the hour and offers a download; the install is confirmed by the person, as Android requires for any app installed outside the Play Store. |
+
+Nothing ever updates in the middle of a consultation. The new code installs
+and waits; a person decides when it takes over.
+
+### One-time setup for desktop updates
+
+Desktop installers are published to the project's GitHub releases, which is
+where `electron-updater` inside the installed application looks. That needs
+the GitHub CLI to be signed in once on the release machine:
+
+```bash
+gh auth login
+```
+
+Without it `npm run release` still builds the installer and says plainly that
+it was not published — installed desktop copies then have nothing to update
+from. Web and Android updates are unaffected.
+
+---
+
 ## 6. The desktop application
 
 ```bash
