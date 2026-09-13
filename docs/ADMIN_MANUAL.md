@@ -62,6 +62,38 @@ patient names and telephone numbers.
 
 Give people the narrowest role that lets them do their job.
 
+### 2.1a People who ask for an account themselves
+
+Anyone who opens the web address sees **"I do not have an account yet"** on
+the sign-in page. They fill in their name, the username they would like, what
+they do, and a PIN they choose themselves.
+
+**Sending that gives them nothing.** No account exists, and they cannot sign
+in, until you approve it. The endpoint has to be open — a new nurse has no
+credentials yet — so treat what arrives there as a claim, not a fact.
+
+**Settings → Users → Account requests → Check.** For each one:
+
+- **Review** shows who asked, what they say they do, their telephone, and
+  when. Approving asks you to set the role, and gives the shortest, narrowest
+  one that does the job.
+- **Decline** leaves no account. They can ask again.
+
+> Approve only if you know who the person is. Check face to face or by
+> telephone first. Anyone in the world who can open the address can send a
+> request, and approving one gives a real person access to real patient
+> records.
+
+Two things worth knowing. Their PIN is scrambled on their own phone before it
+is sent, so neither the server nor you ever see it — after approval they sign
+in with the PIN they already chose, and there is nothing to read out over the
+telephone. And approving synchronises straight away, because until the new
+account reaches the cloud they still cannot sign in; if the device is offline
+at that moment you are told so plainly.
+
+A request for a username that already exists is flagged in the list and
+cannot be approved. Decline it and ask the person to choose another.
+
 ### 2.2 Review the clinical thresholds
 
 **Settings → Clinical.**
