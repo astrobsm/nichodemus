@@ -1,7 +1,7 @@
 /** Settings: project, clinical configuration, users, stations, facilities,
  *  backup, audit, security, demonstration data, storage and About
  *  (spec S49-S51, S61, S69-S72, S85, S86). */
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useApp, useQuery, useStorageInfo } from '../AppState'
 import {
   AlertBox,
@@ -56,7 +56,7 @@ import {
   listBackups,
   restoreBackup,
 } from '../../services/backup'
-import { cloudSignIn, defaultEndpoint } from '../../services/cloudAuth'
+import { cloudSignIn, defaultEndpoint, probeCloud } from '../../services/cloudAuth'
 import { checkForUpdate, platform, type UpdateState } from '../../services/appUpdate'
 import { enqueueAllPhotos, photoSyncEnabled } from '../../db/repo/base'
 import { photoBytes, photoCount } from '../../db/repo/photos'
@@ -1229,6 +1229,24 @@ function SyncSettings() {
   const [busy, setBusy] = useState(false)
   const [clash, setClash] = useState(false)
   const [manualKey, setManualKey] = useState(false)
+  // null while we are still asking; false means the cloud is reachable but
+  // holds no outreach yet, which is what makes this the first device.
+  const [cloudReady, setCloudReady] = useState<boolean | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    const address = endpoint || defaultEndpoint()
+    if (!address) {
+      setCloudReady(null)
+      return
+    }
+    probeCloud(address).then((r) => {
+      if (!cancelled) setCloudReady(r.reachable ? r.ready : null)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [endpoint])
   const photoSync = useQuery(() => photoSyncEnabled(), [])
   const photoStats = useQuery(() => ({ count: photoCount(), bytes: photoBytes() }), [])
 
@@ -1357,6 +1375,28 @@ function SyncSettings() {
               help="Fetched when this device signed in. Change it only if an administrator gives you a new one."
             />
             <button className="btn block" onClick={save}>
+              Save cloud settings
+            </button>
+          </>
+        ) : cloudReady === false ? (
+          // This device holds the only copy of the outreach. Signing in to
+          // fetch a key cannot work yet, because the accounts it would check
+          // against are the ones sitting on this very device, unsent. The
+          // first device is the one case that needs the server key by hand.
+          <>
+            <AlertBox tone="info" title="This is the first device">
+              Nothing has been sent to the cloud yet, so there is no account there to sign in
+              against. Enter the server key once — the <code>SYNC_TOKEN</code> from your Vercel
+              settings — and synchronise. Every other device afterwards just signs in.
+            </AlertBox>
+            <TextField
+              label="Device key"
+              value={token}
+              onChange={setToken}
+              type="password"
+              help="The SYNC_TOKEN set on the server. Needed on this device only."
+            />
+            <button className="btn block large" onClick={save} disabled={!token.trim()}>
               Save cloud settings
             </button>
           </>
