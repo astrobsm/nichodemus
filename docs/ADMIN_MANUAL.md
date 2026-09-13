@@ -480,6 +480,25 @@ replaces the application, never the data. A device with no signal simply does
 not check, and carries on working with the version it has — that is normal,
 and no records are at risk.
 
+### A browser showing an old version
+
+Every screen of the application looks the same whichever version it is, which
+makes a stale copy genuinely hard to spot. The sign-in screen therefore shows
+**Version 1.0.0 · build …** at the bottom. Compare it with **Settings → About**
+on a device you know is current, or with what the server reports.
+
+If a browser is showing an older build and no update bar appears, it is
+serving a copy saved before the update mechanism existed — that copy has no
+way to announce anything, so it cannot tell you it is out of date. It is a
+one-time situation and there are two ways out:
+
+- **Ctrl+Shift+R** (Cmd+Shift+R on a Mac) — reloads past the saved copy.
+- **Close every tab and window of the application, then open it again.**
+
+Either replaces it with the current version, and from then on updates
+announce themselves in the normal way. No records are affected: they live in
+the database on the device, not in the page.
+
 ### Checking by hand
 
 **Settings → About → Check for updates** says which build this device is on
