@@ -12,6 +12,9 @@
  * is sent over HTTPS to be verified and is never stored by the server.
  */
 
+import { hashPin } from '../core/crypto'
+import { uuid } from '../core/ids'
+
 export interface CloudProbe {
   reachable: boolean
   /** True when the cloud holds an outreach and at least one active account. */
@@ -73,13 +76,21 @@ function normalise(endpoint: string): string {
   return endpoint.trim().replace(/\/+$/, '')
 }
 
-async function call(endpoint: string, body: unknown, timeoutMs = 20_000): Promise<unknown> {
+async function call(
+  endpoint: string,
+  body: unknown,
+  timeoutMs = 20_000,
+  token?: string,
+): Promise<unknown> {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), timeoutMs)
   try {
     const response = await fetch(`${normalise(endpoint)}/api/auth`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: {
+        'content-type': 'application/json',
+        ...(token ? { 'x-sync-token': token } : {}),
+      },
       body: JSON.stringify(body),
       signal: controller.signal,
     })
@@ -137,4 +148,105 @@ export async function cloudSignIn(
     throw new CloudAuthError('The outreach did not return a synchronisation key.')
   }
   return result
+}
+
+// ------------------------------------------------------- account requests
+
+export interface AccountRequest {
+  uuid: string
+  username: string
+  fullName: string
+  roleRequested: string | null
+  phone: string | null
+  reason: string | null
+  requestedAt: string
+  deviceId: string | null
+  /** True when an account with that username already exists. */
+  usernameTaken: boolean
+}
+
+/**
+ * Asks an administrator for an account.
+ *
+ * The PIN is turned into a PBKDF2 derivation here, on the requester's own
+ * device, and only the derivation travels. Nobody - not the server, not the
+ * administrator approving it - ever sees the PIN itself, which is the same
+ * promise the application makes about every other PIN it holds.
+ */
+export async function requestAccount(
+  endpoint: string,
+  input: {
+    fullName: string
+    username: string
+    pin: string
+    roleRequested?: string
+    phone?: string
+    reason?: string
+    deviceId: string
+  },
+): Promise<string> {
+  const pinRecord = await hashPin(input.pin)
+  const result = (await call(endpoint, {
+    action: 'request',
+    uuid: uuid(),
+    username: input.username.trim(),
+    fullName: input.fullName.trim(),
+    roleRequested: input.roleRequested ?? null,
+    phone: input.phone ?? null,
+    reason: input.reason ?? null,
+    pinRecord,
+    deviceId: input.deviceId,
+  })) as { message?: string }
+  return result.message ?? 'Your request has been sent.'
+}
+
+/** Everything waiting for a decision. Needs a device the administrator trusts. */
+export async function listAccountRequests(
+  endpoint: string,
+  token: string,
+): Promise<AccountRequest[]> {
+  const result = (await call(endpoint, { action: 'requests' }, 20_000, token)) as {
+    requests: AccountRequest[]
+  }
+  return result.requests
+}
+
+export interface ClaimedRequest {
+  uuid: string
+  username: string
+  fullName: string
+  roleRequested: string | null
+  phone: string | null
+  pin: { hash: string; salt: string; iterations: number }
+}
+
+/** Fetches the PIN derivation so the approved account keeps the chosen PIN. */
+export async function claimAccountRequest(
+  endpoint: string,
+  token: string,
+  requestUuid: string,
+): Promise<ClaimedRequest> {
+  const result = (await call(
+    endpoint,
+    { action: 'claimRequest', uuid: requestUuid },
+    20_000,
+    token,
+  )) as { request: ClaimedRequest }
+  return result.request
+}
+
+export async function decideAccountRequest(
+  endpoint: string,
+  token: string,
+  requestUuid: string,
+  status: 'APPROVED' | 'REJECTED',
+  decidedBy: string,
+  note?: string,
+): Promise<void> {
+  await call(
+    endpoint,
+    { action: 'decideRequest', uuid: requestUuid, status, decidedBy, note: note ?? null },
+    20_000,
+    token,
+  )
 }

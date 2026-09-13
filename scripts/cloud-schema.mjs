@@ -122,6 +122,36 @@ CREATE TABLE IF NOT EXISTS cloud_backups (
 );
 CREATE INDEX IF NOT EXISTS idx_cloud_backups_device ON cloud_backups(device_id, created_at);
 
+-- People asking to be given an account, and the administrator's decision.
+--
+-- Anyone who can open the web address can submit one of these, so a row here
+-- grants nothing at all: it is an application, not an account. The account
+-- itself is only ever created by an administrator, on their own device, in
+-- the ordinary audited way.
+--
+-- The PIN is hashed on the requester's device with the same PBKDF2 derivation
+-- used everywhere else and is never sent in the clear. Carrying the hash lets
+-- an approved person sign in with the PIN they already chose, instead of
+-- being handed a temporary one over the phone.
+CREATE TABLE IF NOT EXISTS account_requests (
+  uuid           TEXT PRIMARY KEY,
+  username       TEXT NOT NULL,
+  full_name      TEXT NOT NULL,
+  role_requested TEXT,
+  phone          TEXT,
+  reason         TEXT,
+  pin_hash       TEXT NOT NULL,
+  pin_salt       TEXT NOT NULL,
+  pin_iterations INTEGER NOT NULL,
+  status         TEXT NOT NULL DEFAULT 'PENDING',
+  requested_at   TEXT NOT NULL,
+  device_id      TEXT,
+  decided_at     TEXT,
+  decided_by     TEXT,
+  decision_note  TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_requests_status ON account_requests(status, requested_at);
+
 CREATE TABLE IF NOT EXISTS cloud_backup_chunks (
   backup_uuid TEXT NOT NULL,
   seq         INTEGER NOT NULL,

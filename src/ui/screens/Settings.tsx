@@ -57,6 +57,7 @@ import {
   restoreBackup,
 } from '../../services/backup'
 import { cloudSignIn, defaultEndpoint, probeCloud } from '../../services/cloudAuth'
+import { AccountRequests } from './AccountRequests'
 import { checkForUpdate, platform, type UpdateState } from '../../services/appUpdate'
 import { enqueueAllPhotos, photoSyncEnabled } from '../../db/repo/base'
 import { photoBytes, photoCount } from '../../db/repo/photos'
@@ -412,6 +413,8 @@ function UserSettings() {
 
   return (
     <>
+      <AccountRequests />
+
       <button className="btn block" onClick={() => setAdding(true)}>
         Add user account
       </button>

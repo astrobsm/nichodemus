@@ -128,6 +128,58 @@ export async function createUser(input: NewUserInput): Promise<number> {
   })
 }
 
+/**
+ * Creates an account from a request the person made themselves.
+ *
+ * Takes the PIN derivation they produced on their own device rather than a
+ * PIN, so the account they get is the one they already know the PIN for. It
+ * is the same PBKDF2 record createUser would have produced; the PIN itself
+ * has never existed anywhere but on their device.
+ *
+ * Only ever called after an administrator has approved the request.
+ */
+export async function createApprovedUser(input: {
+  username: string
+  fullName: string
+  role: string
+  phone?: string
+  pin: { hash: string; salt: string; iterations: number }
+  approvedBy: string
+}): Promise<number> {
+  const username = input.username.trim()
+  if (!username) throw new Error('A username is required.')
+  if (usernameTaken(username)) {
+    throw new Error(`The username "${username}" is already in use. Reject this request, or ask them to choose another.`)
+  }
+  if (!(input.pin.iterations >= 10_000 && input.pin.iterations <= 1_000_000)) {
+    throw new Error('That request does not carry a usable PIN. Ask the person to request again.')
+  }
+
+  return transaction(() => {
+    const id = insertRow('users', {
+      ...insertEnvelope(),
+      username,
+      full_name: input.fullName.trim(),
+      role_code: input.role,
+      pin_hash: input.pin.hash,
+      pin_salt: input.pin.salt,
+      pin_iterations: input.pin.iterations,
+      phone: nullIfBlank(input.phone),
+      is_active: 1,
+      // They chose this PIN themselves, so there is nothing to change.
+      must_change_pin: 0,
+      failed_attempts: 0,
+    })
+    audit({
+      action: AUDIT_ACTIONS.USER_CREATE,
+      entityType: 'user',
+      entityId: id,
+      summary: `Account "${username}" approved by ${input.approvedBy} with role ${input.role}, from a request the person submitted`,
+    })
+    return id
+  })
+}
+
 export async function changePin(userId: number, newPin: string): Promise<void> {
   const pin = await hashPin(newPin, PIN_ITERATIONS)
   const before = getUser(userId)

@@ -35,8 +35,9 @@ import { setSetting } from '../../db/repo/settings'
 import { validatePin, validatePassphrase, firstError, required } from '../../core/validation'
 import { transaction, flush } from '../../db/sqlite'
 import { restoreBackup } from '../../services/backup'
-import { runSync, saveSyncConfig } from '../../services/sync'
+import { runSync, saveSyncConfig, syncConfig } from '../../services/sync'
 import { CloudAuthError, cloudSignIn, defaultEndpoint, probeCloud } from '../../services/cloudAuth'
+import { RequestAccountPanel } from './RequestAccount'
 import { deviceId } from '../../core/ids'
 import { pickFile } from '../../services/fileIo'
 import { setAuditActor } from '../../core/audit'
@@ -49,7 +50,9 @@ const STEP_COUNT = 6
 export function SetupWizard() {
   const { completeSetup } = useApp()
   const toast = useToast()
-  const [mode, setMode] = useState<'CHOOSE' | 'CREATE' | 'JOIN' | 'RESTORE'>('CHOOSE')
+  const [mode, setMode] = useState<'CHOOSE' | 'CREATE' | 'JOIN' | 'RESTORE' | 'REQUEST'>(
+    'CHOOSE',
+  )
   const [step, setStep] = useState(0)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -371,6 +374,24 @@ export function SetupWizard() {
     )
   }
 
+  if (mode === 'REQUEST') {
+    return (
+      <div className="centre-screen">
+        <div className="brand">
+          <Logo size={104} className="brand-seal" />
+          <h1>Request an account</h1>
+          <p>{cloud?.outreach ?? APP_NAME}</p>
+        </div>
+        <div className="panel">
+          <RequestAccountPanel
+            endpoint={joinEndpoint || defaultEndpoint()}
+            onDone={() => setMode('JOIN')}
+          />
+        </div>
+      </div>
+    )
+  }
+
   if (mode === 'JOIN') {
     const known = cloud?.ready === true
     return (
@@ -457,6 +478,14 @@ export function SetupWizard() {
             disabled={busy || !joinEndpoint.trim() || !joinUser.trim() || !joinPin}
           >
             {busy ? 'Signing in…' : 'Sign in'}
+          </button>
+          <div style={{ height: 10 }} />
+          <button
+            className="btn block secondary"
+            onClick={() => setMode('REQUEST')}
+            disabled={busy || !joinEndpoint.trim()}
+          >
+            I do not have an account yet
           </button>
           <div style={{ height: 10 }} />
           <button className="btn block ghost" onClick={() => setMode('CHOOSE')} disabled={busy}>
@@ -753,6 +782,11 @@ export function LoginScreen() {
   const { signIn } = useApp()
   const [username, setUsername] = useState('')
   const [pin, setPin] = useState('')
+  const [requesting, setRequesting] = useState(false)
+  // A request has to reach an administrator, which means it has to reach the
+  // cloud. On a device that has never been connected there is nowhere to send
+  // it, so the button is not offered rather than failing after it is pressed.
+  const requestEndpoint = syncConfig().endpoint || defaultEndpoint()
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [changing, setChanging] = useState<{ userId: number } | null>(null)
@@ -808,6 +842,24 @@ export function LoginScreen() {
     } finally {
       setBusy(false)
     }
+  }
+
+  if (requesting) {
+    return (
+      <div className="centre-screen">
+        <div className="brand">
+          <Logo size={104} className="brand-seal" />
+          <h1>Request an account</h1>
+          <p>{APP_NAME}</p>
+        </div>
+        <div className="panel">
+          <RequestAccountPanel
+            endpoint={requestEndpoint}
+            onDone={() => setRequesting(false)}
+          />
+        </div>
+      </div>
+    )
   }
 
   if (changing) {
@@ -873,6 +925,23 @@ export function LoginScreen() {
         <button className="btn block large" type="submit" disabled={busy || !username || !pin}>
           {busy ? 'Checking…' : 'Sign in'}
         </button>
+
+        {requestEndpoint ? (
+          <>
+            <div style={{ height: 10 }} />
+            <button
+              className="btn block secondary"
+              type="button"
+              onClick={() => setRequesting(true)}
+            >
+              I do not have an account yet
+            </button>
+            <p className="hint" style={{ marginBottom: 0 }}>
+              Ask the administrator for one. They decide what you may see before any account
+              exists.
+            </p>
+          </>
+        ) : null}
       </form>
     </div>
   )
