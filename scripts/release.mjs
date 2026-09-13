@@ -23,6 +23,7 @@ import { execSync } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { githubToken } from './github-token.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const args = process.argv.slice(2)
@@ -118,23 +119,30 @@ if (!skipAndroid) {
 
 if (!skipDesktop) {
   say('Building the desktop installer')
-  if (noPublish) {
-    run('npx electron-builder --publish never')
-  } else if (tryRun('gh auth status')) {
+  const credential = noPublish ? null : githubToken(root)
+  if (credential) {
     // electron-builder publishes to GitHub releases, which is where
-    // electron-updater in the installed application looks.
-    const token = execSync('gh auth token', { cwd: root }).toString().trim()
+    // electron-updater in the installed application looks. The credential is
+    // whatever this machine already uses to reach GitHub — usually git's own,
+    // so a release needs no separate sign-in.
     run('npx electron-builder --publish always', {
-      env: { ...process.env, GH_TOKEN: token },
+      env: { ...process.env, GH_TOKEN: credential.token },
     })
-    console.log('    published to GitHub releases — installed desktop copies will update')
+    console.log(
+      `    published to GitHub releases using ${credential.source}\n` +
+        '    — installed desktop copies will update themselves',
+    )
   } else {
     run('npx electron-builder --publish never')
-    console.log(
-      '\n    NOT PUBLISHED. The desktop installer was built but not uploaded,\n' +
-        '    so installed desktop copies have nothing to update from.\n' +
-        '    Run `gh auth login` once, then `npm run release` again.',
-    )
+    if (!noPublish) {
+      console.log(
+        '\n    NOT PUBLISHED. No GitHub credential was found, so the installer\n' +
+          '    was built but not uploaded, and installed desktop copies have\n' +
+          '    nothing to update from. Run `gh auth login`, then\n' +
+          '    `npm run publish:desktop` — it uploads what was just built\n' +
+          '    without rebuilding it.',
+      )
+    }
   }
 } else {
   console.log('\n    skipping desktop')

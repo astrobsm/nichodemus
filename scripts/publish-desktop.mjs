@@ -15,6 +15,7 @@
  * cannot be published under a version it is not.
  */
 import { execFileSync, execSync } from 'node:child_process'
+import { checkToken, githubToken } from './github-token.mjs'
 import { existsSync, readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -28,11 +29,17 @@ const dir = resolve(root, 'release/desktop')
 let step = 0
 const say = (what) => console.log(`\n[${++step}] ${what}`)
 
+// Found once, up front, and handed to every gh call. A machine that can push
+// to this repository already holds a credential GitHub accepts; making
+// somebody sign the CLI in separately achieves nothing but the delay.
+const found = githubToken(root)
+
 function gh(args, options = {}) {
   return execFileSync('gh', args, {
     cwd: root,
     encoding: 'utf8',
     stdio: options.inherit ? 'inherit' : 'pipe',
+    env: found ? { ...process.env, GH_TOKEN: found.token } : process.env,
     ...options,
   })
 }
@@ -48,20 +55,34 @@ function ghQuiet(args) {
 
 // ------------------------------------------------------------- who are we
 
-say('Checking GitHub sign-in')
-if (!ghQuiet(['auth', 'status'])) {
+say('Finding a way to authenticate')
+if (!found) {
   console.error(
-    '\nThe GitHub CLI is not signed in on this machine.\n\n' +
-      'Signing in to github.com in a web browser does not sign in the CLI -\n' +
-      'they are separate. In a terminal, run:\n\n' +
+    '\nNo GitHub credential could be found on this machine.\n\n' +
+      'Signing in to github.com in a web browser does not sign in the\n' +
+      'command-line tool - they keep separate sessions. In a terminal, run:\n\n' +
       '    gh auth login\n\n' +
-      'Choose GitHub.com, HTTPS, and authenticate in the browser. Then run\n' +
-      'this again. Alternatively set GH_TOKEN to a token with "repo" scope.\n',
+      'or set GH_TOKEN to a token with "repo" scope.\n',
   )
   process.exit(1)
 }
-const who = gh(['api', 'user', '--jq', '.login']).trim()
-console.log(`    signed in as ${who}`)
+const identity = checkToken(found.token)
+if (!identity) {
+  console.error(
+    `\nThe credential from ${found.source} was not accepted by GitHub.\n` +
+      'It may have expired. Run `gh auth login`, or set GH_TOKEN.\n',
+  )
+  process.exit(1)
+}
+if (!identity.canWrite) {
+  console.error(
+    `\nThe credential from ${found.source} belongs to ${identity.login} but\n` +
+      `carries only: ${identity.scopes}\n` +
+      'Publishing a release needs the "repo" scope.\n',
+  )
+  process.exit(1)
+}
+console.log(`    using ${found.source}, as ${identity.login}`)
 
 // ------------------------------------------------------------ the payload
 

@@ -264,7 +264,28 @@ stops if the service worker was not stamped with the current build.
 Nothing ever updates in the middle of a consultation. The new code installs
 and waits; a person decides when it takes over.
 
-### One-time setup for desktop updates
+### Desktop updates need no setting up
+
+`npm run release` publishes the desktop installer by itself. It looks for a
+GitHub credential in three places, in order: the `GH_TOKEN` environment
+variable, the GitHub CLI, and finally **git's own credential for github.com** —
+the one this machine already uses to push. A machine that can push to the
+repository can already prove who it is, so in practice nothing needs setting
+up at all.
+
+To upload an installer that has already been built, without spending minutes
+rebuilding 124 MB:
+
+```bash
+npm run publish:desktop
+```
+
+It refuses to publish a `latest.yml` naming a version other than the installer
+beside it — that combination would tell every desktop copy about an update it
+then fails to download — and reads the feed back from GitHub afterwards to
+confirm an application could really fetch it.
+
+### If no credential can be found
 
 Desktop installers are published to the project's GitHub releases, which is
 where `electron-updater` inside the installed application looks. That needs
@@ -278,21 +299,10 @@ Signing in to github.com **in a web browser is not the same thing** — the
 command-line tool keeps its own sign-in, and without it the CLI reports "not
 logged into any GitHub hosts" no matter how many browser tabs are open.
 Choose GitHub.com, HTTPS, and authenticate in the browser when it asks. The
-token needs the `repo` scope, which is the default.
+token needs the `repo` scope, which is the default. Setting `GH_TOKEN` works
+just as well.
 
-Then, without rebuilding the 124 MB installer:
-
-```bash
-npm run publish:desktop
-```
-
-That uploads the installer, its blockmap and `latest.yml` to the release for
-this version, and reads the feed back afterwards to check a desktop
-application could really fetch it. It refuses to publish if `latest.yml` names
-a different version from the installer beside it, which would advertise an
-update that then fails to download.
-
-Without any of this, `npm run release` still builds the installer and says
+Until one is found, `npm run release` still builds the installer and says
 plainly that it was not published — installed desktop copies then have nothing
 to update from. Web and Android updates are unaffected.
 
