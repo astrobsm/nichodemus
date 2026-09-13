@@ -94,6 +94,34 @@ at that moment you are told so plainly.
 A request for a username that already exists is flagged in the list and
 cannot be approved. Decline it and ask the person to choose another.
 
+### 2.1b Telling someone their account is ready
+
+Whenever you approve a request or add an account yourself, the next screen
+writes the message and offers **Open WhatsApp with this message**. It opens
+WhatsApp addressed to them with the text ready; **you press send**. The
+application cannot send on its own — that needs WhatsApp's paid Business
+service — and it does not claim to, so you always know whether the person has
+actually been told.
+
+Numbers can be written however you normally write them: `0803 000 0123` and
+`+234 803 000 0123` both reach the same person.
+
+**When a PIN is included.** For an account you created, the message carries
+the username and the initial PIN you set. For somebody who asked for an
+account themselves, it carries only the username — they already chose a PIN
+nobody else knows, and there is nothing to send. If they have forgotten it,
+turn on *Send them a new temporary PIN* when approving.
+
+> **A PIN in a chat message cannot be unsent.** It stays in both phones, and a
+> phone that gets lent out is not private. So a temporary PIN is built to stop
+> mattering: it must be changed at first sign-in, and it **expires after 48
+> hours** whether it was used or not. The message says both. Tell people to
+> delete it once they have signed in.
+
+A temporary PIN is shown to you **once**, on that screen, and never again —
+only a scrambled form is stored, so nobody can look it up later. If it is
+lost, issue another rather than hunting for it.
+
 ### 2.2 Review the clinical thresholds
 
 **Settings → Clinical.**
