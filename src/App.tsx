@@ -12,6 +12,7 @@ import { ClinicalScreen } from './ui/screens/Clinical'
 import { OperationsScreen } from './ui/screens/Operations'
 import { ReportsScreen } from './ui/screens/Reports'
 import { SettingsScreen } from './ui/screens/Settings'
+import { LettersScreen } from './ui/screens/Letters'
 import { APP_NAME, APP_SHORT_NAME } from './core/constants'
 import { projectSummaryLine } from './db/repo/projects'
 import { PERMISSIONS } from './core/permissions'
@@ -204,6 +205,10 @@ function Screen({ route }: { route: ReturnType<typeof useRoute> }) {
     case 'reports':
       if (!can(PERMISSIONS.REPORTS_VIEW) && !can(PERMISSIONS.ANALYTICS_VIEW)) return <NotPermitted />
       return <ReportsScreen />
+
+    case 'letters':
+      if (!can(PERMISSIONS.LETTER_VIEW)) return <NotPermitted />
+      return <LettersScreen />
 
     case 'settings':
       return <SettingsScreen />

@@ -91,6 +91,7 @@ export const FOREIGN_KEYS: Record<string, Record<string, string>> = {
     project_id: 'projects',
     wound_id: 'wounds',
   },
+  letters: { project_id: 'projects' },
 }
 
 /**
@@ -128,6 +129,7 @@ export const APPLY_ORDER = [
   'referrals',
   'followups',
   'queue_events',
+  'letters',
   // Last: a photograph points at a wound, and is by far the largest row.
   'clinical_photos',
 ]

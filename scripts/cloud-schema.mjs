@@ -30,7 +30,7 @@ export const SYNCED_TABLES = [
   'followups', 'queue_events', 'suppliers', 'budget_categories', 'budget_items',
   'expenses', 'inventory_items', 'inventory_transactions', 'procurement',
   'mobilisation_activities', 'logistics_items', 'event_checklists',
-  'clinical_photos',
+  'clinical_photos', 'letters',
 ]
 
 export const FOREIGN_KEY_COLUMNS = {
@@ -63,6 +63,7 @@ export const FOREIGN_KEY_COLUMNS = {
   logistics_items: ['project_id'],
   event_checklists: ['project_id'],
   clinical_photos: ['participant_id', 'project_id', 'wound_id'],
+  letters: ['project_id'],
 }
 
 export const CHANGE_LOG = `

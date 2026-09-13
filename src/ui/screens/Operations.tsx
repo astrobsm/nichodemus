@@ -89,9 +89,10 @@ import {
   labelFor,
 } from '../../core/constants'
 import { PERMISSIONS } from '../../core/permissions'
+import { LettersScreen } from './Letters'
 import { formatShortDate, today } from '../../core/datetime'
 
-type Tab = 'inventory' | 'procurement' | 'finance' | 'tasks' | 'team' | 'logistics' | 'checklist' | 'mobilisation'
+type Tab = 'inventory' | 'procurement' | 'finance' | 'tasks' | 'team' | 'logistics' | 'checklist' | 'mobilisation' | 'letters'
 
 const TABS: { key: Tab; label: string; permission: string }[] = [
   { key: 'inventory', label: 'Inventory', permission: PERMISSIONS.INVENTORY_VIEW },
@@ -102,6 +103,7 @@ const TABS: { key: Tab; label: string; permission: string }[] = [
   { key: 'logistics', label: 'Logistics', permission: PERMISSIONS.PROJECT_VIEW },
   { key: 'checklist', label: 'Checklist', permission: PERMISSIONS.PROJECT_VIEW },
   { key: 'mobilisation', label: 'Mobilisation', permission: PERMISSIONS.PROJECT_VIEW },
+  { key: 'letters', label: 'Letters', permission: PERMISSIONS.LETTER_VIEW },
 ]
 
 export function OperationsScreen({ initial }: { initial?: string }) {
@@ -136,6 +138,7 @@ export function OperationsScreen({ initial }: { initial?: string }) {
       {tab === 'logistics' ? <LogisticsPanel projectId={project.id} /> : null}
       {tab === 'checklist' ? <ChecklistPanel projectId={project.id} /> : null}
       {tab === 'mobilisation' ? <MobilisationPanel projectId={project.id} /> : null}
+      {tab === 'letters' ? <LettersScreen /> : null}
     </>
   )
 }

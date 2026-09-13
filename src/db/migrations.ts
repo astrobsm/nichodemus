@@ -7,6 +7,7 @@ import baselineSql from './schema.sql?raw'
 import syncSql from './migrations-sync.sql?raw'
 import photosSql from './migrations-photos.sql?raw'
 import pinExpirySql from './migrations-pin-expiry.sql?raw'
+import lettersSql from './migrations-letters.sql?raw'
 import { exec, query, run, transactionSync, handle } from './sqlite'
 import { nowIso } from '../core/datetime'
 import { uuid } from '../core/ids'
@@ -114,6 +115,13 @@ export const MIGRATIONS: Migration[] = [
       // has no IF NOT EXISTS, and letting it fail would stop a fresh install
       // migrating at all - which is to say, stop the application opening.
       if (!hasColumn('users', 'pin_expires_at')) exec(pinExpirySql)
+    },
+  },
+  {
+    version: 6,
+    name: 'official correspondence',
+    up: () => {
+      exec(lettersSql)
     },
   },
 ]

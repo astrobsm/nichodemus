@@ -71,6 +71,7 @@ export const SYNCABLE_TABLES = [
   'logistics_items',
   'event_checklists',
   'clinical_photos',
+  'letters',
 ] as const
 
 const SYNCABLE = new Set<string>(SYNCABLE_TABLES)
