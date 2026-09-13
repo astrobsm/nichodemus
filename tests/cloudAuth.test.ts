@@ -11,7 +11,7 @@
  *     cross-origin with a custom header, and the browser refuses it before it
  *     reaches the server unless the preflight is answered.
  */
-import { describe, it, expect, beforeAll, afterAll } from 'vitest'
+import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest'
 import { createClient, type Client } from '@libsql/client'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -332,5 +332,66 @@ describe('the device that set the outreach up', () => {
       }),
     )
     expect((await res.json()).ok).toBe(true)
+  })
+})
+
+describe('an outreach that has not been set up yet', () => {
+  /**
+   * The first person to open a fresh deployment used to be told "that
+   * username or PIN is not correct". There was no account to be correct
+   * about, so they went looking for a typing mistake that did not exist and
+   * concluded the application was broken. Exactly that happened.
+   */
+  let empty: Client
+  let emptyAuth: (request: Request) => Promise<Response>
+  let emptyDir: string
+
+  beforeAll(async () => {
+    emptyDir = mkdtempSync(join(tmpdir(), 'nug-empty-'))
+    const url = `file:${join(emptyDir, 'empty.db').replace(/\\/g, '/')}`
+    empty = createClient({ url })
+    await buildCloudSchema(empty)
+
+    // A separate module instance, so it connects to the empty database
+    // rather than the one the rest of this file seeded.
+    vi.resetModules()
+    process.env.TURSO_DATABASE_URL = url
+    emptyAuth = (await import('../api/auth?empty')).webHandler
+  })
+
+  afterAll(() => {
+    empty?.close()
+    try {
+      rmSync(emptyDir, { recursive: true, force: true })
+    } catch {
+      /* already gone */
+    }
+  })
+
+  it('says so, instead of blaming the PIN', async () => {
+    const res = await post(emptyAuth, { username: 'ada', pin: '4821', deviceId: 'first-phone' })
+    const body = await res.json()
+    expect(body.reason).toBe('NO_OUTREACH')
+    expect(body.error).not.toMatch(/not correct/i)
+    expect(body.error).toMatch(/no outreach has been set up/i)
+  })
+
+  it('tells the person what to do about it', async () => {
+    const body = await (
+      await post(emptyAuth, { username: 'anyone', pin: '0000', deviceId: 'first-phone' })
+    ).json()
+    expect(body.error).toMatch(/set up a new outreach/i)
+  })
+
+  it('is not mistaken for a wrong PIN by the status code', async () => {
+    const res = await post(emptyAuth, { username: 'ada', pin: '4821', deviceId: 'first-phone' })
+    expect(res.status).toBe(409)
+    expect(res.status).not.toBe(401)
+  })
+
+  it('reports itself as not ready when asked', async () => {
+    const body = await (await post(emptyAuth, { action: 'probe' })).json()
+    expect(body.ok).toBe(true)
+    expect(body.ready).toBe(false)
   })
 })

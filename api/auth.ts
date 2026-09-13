@@ -162,6 +162,26 @@ export async function handleAuth(input: {
   if (!deviceId) return reply({ ok: false, error: 'This device did not identify itself.' }, 400)
 
   try {
+    // An outreach with no accounts at all cannot be signed in to by anybody,
+    // and answering "that username or PIN is not correct" sends the person
+    // looking for a typing mistake that does not exist. There is nothing to
+    // conceal here either: with no accounts, saying so reveals nothing about
+    // anyone. Tell the truth and say what to do instead.
+    const accounts = await db().execute(
+      'SELECT COUNT(*) AS n FROM users WHERE deleted_at IS NULL AND is_active = 1',
+    )
+    if (Number(accounts.rows[0].n) === 0) {
+      return reply(
+        {
+          ok: false,
+          reason: 'NO_OUTREACH',
+          error:
+            'No outreach has been set up at this address yet, so there are no accounts to sign in to. Someone has to choose "Set up a new outreach" on one device first, then synchronise.',
+        },
+        409,
+      )
+    }
+
     const { locked } = await lockState(username)
     if (locked) {
       return reply(

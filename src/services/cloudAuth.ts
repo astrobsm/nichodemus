@@ -26,9 +26,12 @@ export interface CloudSignIn {
 }
 
 export class CloudAuthError extends Error {
-  constructor(message: string) {
+  /** Set when the cause is known precisely, e.g. NO_OUTREACH. */
+  readonly reason: string | null
+  constructor(message: string, reason: string | null = null) {
     super(message)
     this.name = 'CloudAuthError'
+    this.reason = reason
   }
 }
 
@@ -81,10 +84,12 @@ async function call(endpoint: string, body: unknown, timeoutMs = 20_000): Promis
       signal: controller.signal,
     })
     const json = (await response.json().catch(() => null)) as
-      | { ok?: boolean; error?: string }
+      | { ok?: boolean; error?: string; reason?: string }
       | null
     if (!json) throw new CloudAuthError('The outreach did not answer in a way we understand.')
-    if (!json.ok) throw new CloudAuthError(json.error ?? 'The outreach refused the request.')
+    if (!json.ok) {
+      throw new CloudAuthError(json.error ?? 'The outreach refused the request.', json.reason ?? null)
+    }
     return json
   } catch (err) {
     if (err instanceof CloudAuthError) throw err

@@ -36,7 +36,7 @@ import { validatePin, validatePassphrase, firstError, required } from '../../cor
 import { transaction, flush } from '../../db/sqlite'
 import { restoreBackup } from '../../services/backup'
 import { runSync, saveSyncConfig } from '../../services/sync'
-import { cloudSignIn, defaultEndpoint, probeCloud } from '../../services/cloudAuth'
+import { CloudAuthError, cloudSignIn, defaultEndpoint, probeCloud } from '../../services/cloudAuth'
 import { deviceId } from '../../core/ids'
 import { pickFile } from '../../services/fileIo'
 import { setAuditActor } from '../../core/audit'
@@ -96,7 +96,12 @@ export function SetupWizard() {
   const [joinUser, setJoinUser] = useState('')
   const [joinPin, setJoinPin] = useState('')
   const [joinProgress, setJoinProgress] = useState('')
-  const [cloud, setCloud] = useState<{ ready: boolean; outreach: string | null } | null>(null)
+  const [noOutreach, setNoOutreach] = useState(false)
+  const [cloud, setCloud] = useState<{
+    reachable: boolean
+    ready: boolean
+    outreach: string | null
+  } | null>(null)
 
   // Ask the address this application is served from whether an outreach is
   // already running there. When there is one, staff sign straight in and
@@ -105,12 +110,14 @@ export function SetupWizard() {
     let cancelled = false
     const endpoint = defaultEndpoint()
     if (!endpoint) {
-      setCloud({ ready: false, outreach: null })
+      setCloud({ reachable: false, ready: false, outreach: null })
       return
     }
     probeCloud(endpoint).then((result) => {
       if (cancelled) return
-      setCloud({ ready: result.ready, outreach: result.outreach })
+      setCloud({ reachable: result.reachable, ready: result.ready, outreach: result.outreach })
+      // Only send people straight to sign-in when there is actually something
+      // to sign in to. Otherwise they meet a sign-in form that cannot succeed.
       if (result.ready) setMode('JOIN')
     })
     return () => {
@@ -205,6 +212,7 @@ export function SetupWizard() {
   async function doJoin() {
     setBusy(true)
     setError(null)
+    setNoOutreach(false)
     try {
       setJoinProgress('Checking your details…')
       const credentials = await cloudSignIn(joinEndpoint, joinUser, joinPin, deviceId())
@@ -250,6 +258,12 @@ export function SetupWizard() {
       toast('ok', `Welcome, ${credentials.user.fullName}. ${result.pulled} records received.`)
       completeSetup()
     } catch (err) {
+      // Distinguish "your PIN is wrong" from "there is nothing here" — they
+      // lead to completely different actions.
+      if (err instanceof CloudAuthError && err.reason === 'NO_OUTREACH') {
+        setNoOutreach(true)
+        setCloud((prev) => ({ reachable: true, ready: false, outreach: prev?.outreach ?? null }))
+      }
       setError(friendlyError(err, 'You could not be signed in.'))
     } finally {
       setJoinProgress('')
@@ -292,6 +306,9 @@ export function SetupWizard() {
     }
   }
 
+  // The address answered, and said there is no outreach and no account there.
+  const firstEver = cloud?.reachable === true && cloud?.ready === false
+
   if (mode === 'CHOOSE') {
     return (
       <div className="centre-screen">
@@ -305,17 +322,39 @@ export function SetupWizard() {
             This application keeps all of its information in a database on this device. It works
             without internet, mobile data or a server.
           </p>
-          <button className="btn block large" onClick={() => setMode('JOIN')}>
-            Sign in to an outreach
-          </button>
-          <p className="hint" style={{ marginTop: 6 }}>
-            For everyone but the person setting the outreach up. Your username and PIN bring the
-            project, the team and the records to this device.
-          </p>
-          <div style={{ height: 12 }} />
-          <button className="btn block secondary" onClick={() => setMode('CREATE')}>
-            Set up a new outreach
-          </button>
+
+          {firstEver ? (
+            // Nothing exists yet. Offering "sign in" first would send the
+            // first person into a form that cannot possibly succeed, and the
+            // only answer it could give them is that their PIN is wrong.
+            <>
+              <AlertBox tone="info" title="Nobody has set this outreach up yet">
+                You are the first. Create the outreach and your own administrator account here,
+                then synchronise — after that everyone else just signs in.
+              </AlertBox>
+              <button className="btn block large" onClick={() => setMode('CREATE')}>
+                Set up the outreach
+              </button>
+              <div style={{ height: 12 }} />
+              <button className="btn block secondary" onClick={() => setMode('JOIN')}>
+                Sign in to an outreach elsewhere
+              </button>
+            </>
+          ) : (
+            <>
+              <button className="btn block large" onClick={() => setMode('JOIN')}>
+                Sign in to an outreach
+              </button>
+              <p className="hint" style={{ marginTop: 6 }}>
+                For everyone but the person setting the outreach up. Your username and PIN bring
+                the project, the team and the records to this device.
+              </p>
+              <div style={{ height: 12 }} />
+              <button className="btn block secondary" onClick={() => setMode('CREATE')}>
+                Set up a new outreach
+              </button>
+            </>
+          )}
           <div style={{ height: 10 }} />
           <button className="btn block secondary" onClick={() => setMode('RESTORE')}>
             Restore existing backup
@@ -347,11 +386,25 @@ export function SetupWizard() {
               Use the username and PIN your administrator gave you. Everything this device needs
               arrives with you — there is nothing to set up.
             </p>
+          ) : firstEver ? (
+            <AlertBox tone="warn" title="There is no outreach at this address yet">
+              No account exists here, so no username or PIN can work. Somebody has to set the
+              outreach up once and synchronise it first.
+            </AlertBox>
           ) : (
             <AlertBox tone="info" title="Where is the outreach?">
               Enter the web address your administrator gave you, then your own username and PIN.
             </AlertBox>
           )}
+
+          {firstEver ? (
+            <>
+              <button className="btn block large" onClick={() => setMode('CREATE')}>
+                Set up the outreach on this device
+              </button>
+              <div style={{ height: 10 }} />
+            </>
+          ) : null}
 
           {!known ? (
             <TextField
@@ -382,8 +435,19 @@ export function SetupWizard() {
 
           {joinProgress ? <p className="hint">{joinProgress}</p> : null}
           {error ? (
-            <AlertBox tone="danger" title="Could not sign in">
+            <AlertBox
+              tone={noOutreach ? 'warn' : 'danger'}
+              title={noOutreach ? 'There is nothing to sign in to yet' : 'Could not sign in'}
+            >
               {error}
+              {noOutreach ? (
+                <>
+                  <div style={{ height: 10 }} />
+                  <button className="btn small" onClick={() => setMode('CREATE')}>
+                    Set up the outreach
+                  </button>
+                </>
+              ) : null}
             </AlertBox>
           ) : null}
 
