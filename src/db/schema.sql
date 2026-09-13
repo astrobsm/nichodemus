@@ -147,6 +147,10 @@ CREATE TABLE IF NOT EXISTS users (
   email           TEXT,
   is_active       INTEGER NOT NULL DEFAULT 1,
   must_change_pin INTEGER NOT NULL DEFAULT 0,
+  -- Set when an administrator issues a temporary PIN. The PIN stops working
+  -- at this moment whether it has been used or not, so one sent through a
+  -- chat application does not stay usable in that history for ever.
+  pin_expires_at  TEXT,
   failed_attempts INTEGER NOT NULL DEFAULT 0,
   locked_until    TEXT,
   last_login_at   TEXT,

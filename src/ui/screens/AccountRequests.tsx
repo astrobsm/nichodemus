@@ -16,6 +16,7 @@ import {
   Modal,
   SelectField,
   TextField,
+  Toggle,
   friendlyError,
   useToast,
 } from '../components/ui'
@@ -25,13 +26,15 @@ import {
   listAccountRequests,
   type AccountRequest,
 } from '../../services/cloudAuth'
-import { createApprovedUser } from '../../db/repo/users'
+import { createApprovedUser, issueTemporaryPin } from '../../db/repo/users'
+import { SendCredentials, type CredentialHandover } from './SendCredentials'
 import { isSyncConfigured, runSync, syncConfig } from '../../services/sync'
 import { ROLE_DEFINITIONS, roleName, type RoleCode } from '../../core/permissions'
 import { relativeDateTime } from '../../core/datetime'
+import { APP_NAME } from '../../core/constants'
 
 export function AccountRequests() {
-  const { refresh, user } = useApp()
+  const { refresh, user, project } = useApp()
   const toast = useToast()
   const config = useQuery(() => syncConfig(), [])
   const [requests, setRequests] = useState<AccountRequest[] | null>(null)
@@ -41,6 +44,11 @@ export function AccountRequests() {
   const [role, setRole] = useState<RoleCode>('VOLUNTEER')
   const [rejecting, setRejecting] = useState<AccountRequest | null>(null)
   const [note, setNote] = useState('')
+  // Whether to replace the PIN they chose with one we send them. Off by
+  // default: they already have a PIN nobody else knows, and putting a working
+  // credential into a chat message is strictly worse when it is not needed.
+  const [sendPin, setSendPin] = useState(false)
+  const [handover, setHandover] = useState<CredentialHandover | null>(null)
 
   const connected = config.endpoint !== '' && config.token !== ''
 
@@ -64,7 +72,7 @@ export function AccountRequests() {
       // Fetch the PIN derivation the person produced on their own device, so
       // the account they get is the one they already know the PIN for.
       const claimed = await claimAccountRequest(config.endpoint, config.token, deciding.uuid)
-      await createApprovedUser({
+      const newUserId = await createApprovedUser({
         username: claimed.username,
         fullName: claimed.fullName,
         role,
@@ -72,6 +80,12 @@ export function AccountRequests() {
         pin: claimed.pin,
         approvedBy: user?.full_name ?? user?.username ?? 'an administrator',
       })
+      // Issued before synchronising, so the PIN that reaches the cloud is the
+      // one the person will actually be sent.
+      const temporary = sendPin
+        ? await issueTemporaryPin(newUserId, user?.full_name ?? user?.username ?? 'an administrator')
+        : null
+
       await decideAccountRequest(
         config.endpoint,
         config.token,
@@ -96,12 +110,19 @@ export function AccountRequests() {
       setDeciding(null)
       refresh()
       await load()
-      toast(
-        synced ? 'ok' : 'warn',
-        synced
-          ? `${claimed.fullName} can now sign in.`
-          : `${claimed.fullName} was approved, but this device could not synchronise. They cannot sign in until it does.`,
-      )
+      setHandover({
+        fullName: claimed.fullName,
+        username: claimed.username,
+        phone: claimed.phone ?? deciding.phone,
+        pin: temporary?.pin,
+        expiresAt: temporary?.expiresAt,
+      })
+      if (!synced) {
+        toast(
+          'warn',
+          `${claimed.fullName} was approved, but this device could not synchronise. They cannot sign in until it does.`,
+        )
+      }
     } catch (err) {
       toast('danger', friendlyError(err, 'The request could not be approved.'))
     } finally {
@@ -140,6 +161,17 @@ export function AccountRequests() {
           address and device key under Cloud sync first.
         </AlertBox>
       </Card>
+    )
+  }
+
+  if (handover) {
+    return (
+      <SendCredentials
+        handover={handover}
+        outreach={project?.name ?? APP_NAME}
+        webAddress={config.endpoint || undefined}
+        onDone={() => setHandover(null)}
+      />
     )
   }
 
@@ -232,6 +264,13 @@ export function AccountRequests() {
             Give the narrowest role that lets them do their job. You can change it afterwards under
             Users.
           </p>
+
+          <Toggle
+            label="Send them a new temporary PIN"
+            checked={sendPin}
+            onChange={setSendPin}
+            help="They already chose a PIN when they asked, and nobody else knows it. Turn this on only if they have forgotten it — it replaces their PIN with one you send, which then sits in a chat message until they change it."
+          />
 
           <div className="btn-row">
             <button className="btn secondary" onClick={() => setDeciding(null)} disabled={busy}>

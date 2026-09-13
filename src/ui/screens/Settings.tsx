@@ -58,6 +58,7 @@ import {
 } from '../../services/backup'
 import { cloudSignIn, defaultEndpoint, probeCloud } from '../../services/cloudAuth'
 import { AccountRequests } from './AccountRequests'
+import { SendCredentials, type CredentialHandover } from './SendCredentials'
 import { checkForUpdate, platform, type UpdateState } from '../../services/appUpdate'
 import { enqueueAllPhotos, photoSyncEnabled } from '../../db/repo/base'
 import { photoBytes, photoCount } from '../../db/repo/photos'
@@ -404,15 +405,25 @@ function ClinicalSettings() {
 // --------------------------------------------------------------- users
 
 function UserSettings() {
-  const { user: currentUser, refresh } = useApp()
+  const { user: currentUser, refresh, project } = useApp()
   const toast = useToast()
   const users = useQuery(() => listUsers(), [])
   const [adding, setAdding] = useState(false)
   const [editing, setEditing] = useState<User | null>(null)
   const [deleting, setDeleting] = useState<User | null>(null)
+  const [handover, setHandover] = useState<CredentialHandover | null>(null)
 
   return (
     <>
+      {handover ? (
+        <SendCredentials
+          handover={handover}
+          outreach={project?.name ?? APP_NAME}
+          webAddress={syncConfig().endpoint || undefined}
+          onDone={() => setHandover(null)}
+        />
+      ) : null}
+
       <AccountRequests />
 
       <button className="btn block" onClick={() => setAdding(true)}>
@@ -467,10 +478,11 @@ function UserSettings() {
         >
           <UserForm
             user={editing}
-            onSaved={() => {
+            onSaved={(created) => {
               setAdding(false)
               setEditing(null)
               refresh()
+              if (created) setHandover(created)
               toast('ok', 'User account saved.')
             }}
           />
@@ -501,7 +513,13 @@ function UserSettings() {
   )
 }
 
-function UserForm({ user, onSaved }: { user: User | null; onSaved: () => void }) {
+function UserForm({
+  user,
+  onSaved,
+}: {
+  user: User | null
+  onSaved: (created?: CredentialHandover) => void
+}) {
   const [fullName, setFullName] = useState(user?.full_name ?? '')
   const [username, setUsername] = useState(user?.username ?? '')
   const [role, setRole] = useState<RoleCode>(user?.role_code ?? 'VOLUNTEER')
@@ -539,6 +557,10 @@ function UserForm({ user, onSaved }: { user: User | null; onSaved: () => void })
           phone,
           mustChangePin: true,
         })
+        // The administrator typed this PIN, so it can be handed over without
+        // issuing another. They still have to change it at first sign-in.
+        onSaved({ fullName, username, phone: phone || null, pin })
+        return
       }
       onSaved()
     } catch (err) {

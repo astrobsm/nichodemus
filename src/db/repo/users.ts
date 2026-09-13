@@ -29,6 +29,8 @@ interface UserSecret extends User {
   pin_hash: string
   pin_salt: string
   pin_iterations: number
+  /** Set only while a temporary PIN issued by an administrator is in force. */
+  pin_expires_at: string | null
 }
 
 const MAX_FAILED_ATTEMPTS = 5
@@ -180,6 +182,59 @@ export async function createApprovedUser(input: {
   })
 }
 
+/** How long a PIN sent to somebody stays usable. */
+export const TEMPORARY_PIN_HOURS = 48
+
+/**
+ * A temporary PIN, issued by an administrator so it can be sent to the person.
+ *
+ * Six digits from the system's cryptographic random source, never a pattern
+ * anybody could guess from the person's name or the date. It is returned in
+ * the clear exactly once, to the administrator who issued it, and is not
+ * recoverable afterwards - only its PBKDF2 derivation is stored, like every
+ * other PIN in this application.
+ *
+ * Two things make it safe enough to send through a chat application, which is
+ * otherwise a poor place for a credential: it has to be changed at first
+ * sign-in, and it stops working after TEMPORARY_PIN_HOURS whether it is used
+ * or not. A message nobody can unsend therefore stops mattering on its own.
+ */
+export async function issueTemporaryPin(
+  userId: number,
+  issuedBy: string,
+): Promise<{ pin: string; expiresAt: string }> {
+  const digits = new Uint32Array(6)
+  crypto.getRandomValues(digits)
+  const pin = [...digits].map((d) => d % 10).join('')
+
+  const derived = await hashPin(pin, PIN_ITERATIONS)
+  const expiresAt = toIso(new Date(Date.now() + TEMPORARY_PIN_HOURS * 60 * 60_000))
+  const before = getUser(userId)
+
+  await transaction(() => {
+    updateRow('users', userId, {
+      ...updateEnvelope(before?.version),
+      pin_hash: derived.hash,
+      pin_salt: derived.salt,
+      pin_iterations: derived.iterations,
+      must_change_pin: 1,
+      pin_expires_at: expiresAt,
+      failed_attempts: 0,
+      locked_until: null,
+    })
+    audit({
+      action: AUDIT_ACTIONS.USER_UPDATE,
+      entityType: 'user',
+      entityId: userId,
+      // The PIN itself is never written here, only the fact of issuing one.
+      summary: `Temporary PIN issued by ${issuedBy}, expires ${expiresAt}`,
+    })
+  })
+
+  return { pin, expiresAt }
+}
+
+
 export async function changePin(userId: number, newPin: string): Promise<void> {
   const pin = await hashPin(newPin, PIN_ITERATIONS)
   const before = getUser(userId)
@@ -190,6 +245,9 @@ export async function changePin(userId: number, newPin: string): Promise<void> {
       pin_salt: pin.salt,
       pin_iterations: pin.iterations,
       must_change_pin: 0,
+      // The PIN is now one only this person knows, so there is nothing left
+      // to expire.
+      pin_expires_at: null,
       failed_attempts: 0,
       locked_until: null,
     })
@@ -292,6 +350,25 @@ export async function login(username: string, pin: string): Promise<LoginResult>
     salt: secret.pin_salt,
     iterations: Number(secret.pin_iterations),
   })
+
+  if (valid && secret.pin_expires_at && new Date(secret.pin_expires_at).getTime() <= Date.now()) {
+    // Checked only once the PIN is known to be right: answering "expired"
+    // to a wrong PIN would confirm to a guesser that the account exists and
+    // that a temporary PIN was issued for it.
+    await transaction(() => {
+      audit({
+        action: AUDIT_ACTIONS.LOGIN_FAILED,
+        entityType: 'user',
+        entityId: secret.id,
+        summary: 'Sign-in refused: the temporary PIN had expired',
+      })
+    })
+    return {
+      ok: false,
+      reason:
+        'That temporary PIN has expired. Ask your administrator to send you a new one.',
+    }
+  }
 
   if (!valid) {
     const attempts = Number(secret.failed_attempts) + 1

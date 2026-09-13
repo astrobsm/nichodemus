@@ -6,6 +6,7 @@
 import baselineSql from './schema.sql?raw'
 import syncSql from './migrations-sync.sql?raw'
 import photosSql from './migrations-photos.sql?raw'
+import pinExpirySql from './migrations-pin-expiry.sql?raw'
 import { exec, query, run, transactionSync, handle } from './sqlite'
 import { nowIso } from '../core/datetime'
 import { uuid } from '../core/ids'
@@ -14,6 +15,15 @@ import {
   ROLE_DEFINITIONS,
 } from '../core/permissions'
 import { DEFAULT_THRESHOLDS, THRESHOLD_METADATA } from '../core/clinicalRules'
+
+/** Whether a table already has a column, so a migration can be idempotent. */
+function hasColumn(table: string, column: string): boolean {
+  try {
+    return query<{ name: string }>(`PRAGMA table_info(${table})`).some((c) => c.name === column)
+  } catch {
+    return false
+  }
+}
 
 export interface Migration {
   version: number
@@ -93,6 +103,17 @@ export const MIGRATIONS: Migration[] = [
     name: 'clinical photographs',
     up: () => {
       exec(photosSql)
+    },
+  },
+  {
+    version: 5,
+    name: 'expiry for temporary PINs',
+    up: () => {
+      // A database created from the current baseline already has the column,
+      // while one created before this build does not. ALTER TABLE ADD COLUMN
+      // has no IF NOT EXISTS, and letting it fail would stop a fresh install
+      // migrating at all - which is to say, stop the application opening.
+      if (!hasColumn('users', 'pin_expires_at')) exec(pinExpirySql)
     },
   },
 ]
