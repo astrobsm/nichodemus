@@ -121,7 +121,13 @@ export function SetupWizard() {
       setCloud({ reachable: result.reachable, ready: result.ready, outreach: result.outreach })
       // Only send people straight to sign-in when there is actually something
       // to sign in to. Otherwise they meet a sign-in form that cannot succeed.
-      if (result.ready) setMode('JOIN')
+      //
+      // And only if they are still on the opening screen. This answer arrives
+      // from the network a moment after the screen appears, by which time
+      // somebody may already have chosen to set an outreach up or restore a
+      // backup — pulling them out of a wizard they are typing into, with no
+      // explanation, is how a half-filled form gets silently discarded.
+      if (result.ready) setMode((current) => (current === 'CHOOSE' ? 'JOIN' : current))
     })
     return () => {
       cancelled = true
