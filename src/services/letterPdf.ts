@@ -220,7 +220,21 @@ export async function renderLetter(
   // rule, name and title - and no more: reserving more than that pushes the
   // block onto a page of its own in the very cases where it would have fitted,
   // which is the problem it exists to avoid.
-  ensure(ctx, 34, ref)
+  //
+  // The close, the signature, the enclosures and the copies are one block and
+  // move together. Splitting them produces a second page carrying a signature
+  // and nothing else, which looks like a page went missing in the post.
+  const enclosureList = letter.enclosures.filter((e) => e.trim())
+  const copyList = letter.copies.filter((c) => c.trim())
+  const tailHeight =
+    32 +
+    (letter.signatoryTitle ? 5 : 0) +
+    (enclosureList.length ? 11 + enclosureList.length * 4.8 : 0) +
+    (copyList.length ? 11 + copyList.length * 4.8 : 0)
+
+  // The tail may sit lower than body text: it is the end of the letter, and
+  // the page number is not until 285.
+  if (ctx.y + tailHeight > 278) newPage(ctx, ref)
   ctx.y += 4
   doc.setFont('times', 'normal')
   doc.setFontSize(11.5)
@@ -252,10 +266,9 @@ export async function renderLetter(
   }
 
   // --- enclosures and copies -------------------------------------------
-  const enclosures = letter.enclosures.filter((e) => e.trim())
+  const enclosures = enclosureList
   if (enclosures.length > 0) {
     ctx.y += 6
-    ensure(ctx, 8 + enclosures.length * 5, ref)
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(9.5)
     doc.setTextColor(20, 20, 20)
@@ -269,10 +282,9 @@ export async function renderLetter(
     })
   }
 
-  const copies = letter.copies.filter((c) => c.trim())
+  const copies = copyList
   if (copies.length > 0) {
     ctx.y += 6
-    ensure(ctx, 8 + copies.length * 5, ref)
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(9.5)
     doc.setTextColor(20, 20, 20)
