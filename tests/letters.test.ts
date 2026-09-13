@@ -27,7 +27,7 @@ import {
   splitList,
   updateLetter,
 } from '../src/db/repo/letters'
-import { nextReference } from '../src/services/letterPdf'
+import { nextReference, tailFits, tailHeight, TAIL_BOTTOM } from '../src/services/letterPdf'
 import { auditForEntity } from '../src/core/audit'
 
 let fx: Fixture
@@ -234,5 +234,56 @@ describe('removing one', () => {
     expect(getLetter(id)).toBeNull()
     const entries = auditForEntity('letter', id)
     expect(entries.some((e) => /Written in error/.test(e.summary ?? ''))).toBe(true)
+  })
+})
+
+describe('how a letter breaks across pages', () => {
+  const bare = { signatoryTitle: '', enclosures: [] as string[], copies: [] as string[] }
+
+  it('keeps the whole end of the letter together', () => {
+    // A second page carrying a signature and nothing else looks like a page
+    // went missing in the post. The close, the space to sign, the name and
+    // any enclosures move as one block.
+    const withLists = {
+      signatoryTitle: 'Project Director',
+      enclosures: ['Programme', 'Services', 'Team'],
+      copies: ['The Permanent Secretary', 'The Director of Public Health'],
+    }
+    expect(tailHeight(withLists)).toBeGreaterThan(tailHeight(bare))
+  })
+
+  it('counts the space to sign in, not just the lines of text', () => {
+    // Without room to sign, the name sits directly under the close and there
+    // is nowhere to put a pen.
+    expect(tailHeight(bare)).toBeGreaterThanOrEqual(30)
+  })
+
+  it('lets the end of a letter sit lower than body text', () => {
+    // It is the end; there is nothing to follow it but the page number.
+    expect(TAIL_BOTTOM).toBeGreaterThan(268)
+    expect(TAIL_BOTTOM).toBeLessThan(285)
+  })
+
+  it('fits a signature onto a page with a third of it left', () => {
+    // This is the case that used to break to a new page unnecessarily.
+    expect(tailFits(243, bare)).toBe(true)
+  })
+
+  it('moves to a new page when there is genuinely no room', () => {
+    expect(tailFits(265, bare)).toBe(false)
+  })
+
+  it('moves a long tail down rather than splitting it', () => {
+    const long = {
+      signatoryTitle: 'Project Director',
+      enclosures: ['a', 'b', 'c'],
+      copies: ['d', 'e'],
+    }
+    expect(tailFits(243, long)).toBe(false)
+    expect(tailFits(60, long)).toBe(true)
+  })
+
+  it('ignores blank enclosure lines when measuring', () => {
+    expect(tailHeight({ ...bare, enclosures: ['', '   '] })).toBe(tailHeight(bare))
   })
 })

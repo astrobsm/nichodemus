@@ -122,6 +122,46 @@ A temporary PIN is shown to you **once**, on that screen, and never again —
 only a scrambled form is stored, so nobody can look it up later. If it is
 lost, issue another rather than hunting for it.
 
+### 2.1c Official letters
+
+**Operations → Letters.** Thirteen drafts to work from, each written for a
+particular recipient, printed on the outreach letterhead with the seal, and
+saved as a PDF you can print, hand over or send.
+
+Write them in this order, and start early:
+
+| When | Letter |
+| --- | --- |
+| 8–10 weeks | Appeal for sponsorship — funds must be in hand before you commit |
+| 6–8 weeks | **The traditional ruler.** Nothing else goes out before the palace has agreed |
+| 6 weeks | Town union and elders · Commissioner for Health · Local Government Chairman · the venue · partner organisations |
+| 4 weeks | Medical Officer of Health · the hospital that will receive your referrals |
+| 2–3 weeks | The police, so they know a crowd is expected |
+| 1–2 weeks | The press |
+| Within 2 weeks after | Thank everyone who helped |
+| Within 4 weeks after | Submit the report to the Ministry |
+
+Every segment of an official letter has its own field — reference number,
+date, the recipient's title and office, salutation, subject, body, close,
+signatory, enclosures and copies — because that is what the person receiving
+it looks for.
+
+**The drafts are starting points, not forms.** Read every one before it goes
+out and change what does not fit. The salutations matter: a traditional ruler
+is *Your Royal Highness*, a Commissioner is *Honourable Commissioner*, and
+getting it wrong is noticed.
+
+Details the application already knows — the venue, the date, the expected
+number, the honouree — are filled in for you. Anything it does not know is
+left visible as `[medical director]` rather than left blank, and the editor
+warns you at the top. Fill those in, or complete them under **Settings →
+Project** so every future letter has them.
+
+A letter marked **Draft** is stamped DRAFT across the page so it cannot be
+delivered by mistake. Set it to **Final** before printing. Afterwards, record
+who delivered it and how — "by hand, through the Permanent Secretary's
+office" is the kind of note that settles a question months later.
+
 ### 2.2 Review the clinical thresholds
 
 **Settings → Clinical.**

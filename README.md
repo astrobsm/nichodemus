@@ -81,7 +81,7 @@ Full walkthrough: **[docs/CLOUD.md](docs/CLOUD.md)**.
 ```bash
 npm run dev        # http://localhost:5173
 npm run build      # dist/ — the web application, ~2 MB
-npm test           # 258 tests against a real SQLite database
+npm test           # 285 tests against a real SQLite database
 npm run typecheck
 ```
 
@@ -161,8 +161,9 @@ tests/cloudBackup.test.ts    17  chunked off-site backup, pruning, ciphertext on
 tests/appUpdate.test.ts      22  build stamping, the update check, what it reports
 tests/accountRequests.test.ts 19  self-service requests grant nothing until approved
 tests/credentialHandover.test.ts 18  temporary PINs, expiry, the WhatsApp message
+tests/letters.test.ts        27  letter templates, placeholders, page breaks
                             ───
-                            258  all passing
+                            285  all passing
 ```
 
 The suites run against a real SQLite database, not a mock.

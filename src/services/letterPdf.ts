@@ -137,6 +137,32 @@ function ensure(ctx: Ctx, needed: number, reference: string): void {
   if (ctx.y + needed > BOTTOM) newPage(ctx, reference)
 }
 
+/** The lowest the end of a letter may sit; the page number is not until 285. */
+export const TAIL_BOTTOM = 278
+
+/**
+ * How much room the end of the letter needs: the close, the space to sign,
+ * the rule, the name and title, and any enclosures and copies.
+ */
+export function tailHeight(letter: Pick<LetterContent, 'signatoryTitle' | 'enclosures' | 'copies'>): number {
+  const enclosures = letter.enclosures.filter((e) => e.trim()).length
+  const copies = letter.copies.filter((c) => c.trim()).length
+  return (
+    32 +
+    (letter.signatoryTitle ? 5 : 0) +
+    (enclosures ? 11 + enclosures * 4.8 : 0) +
+    (copies ? 11 + copies * 4.8 : 0)
+  )
+}
+
+/** Whether the whole end of the letter still fits below this point. */
+export function tailFits(
+  y: number,
+  letter: Pick<LetterContent, 'signatoryTitle' | 'enclosures' | 'copies'>,
+): boolean {
+  return y + tailHeight(letter) <= TAIL_BOTTOM
+}
+
 export async function renderLetter(
   project: Project,
   letter: LetterContent,
@@ -226,15 +252,7 @@ export async function renderLetter(
   // and nothing else, which looks like a page went missing in the post.
   const enclosureList = letter.enclosures.filter((e) => e.trim())
   const copyList = letter.copies.filter((c) => c.trim())
-  const tailHeight =
-    32 +
-    (letter.signatoryTitle ? 5 : 0) +
-    (enclosureList.length ? 11 + enclosureList.length * 4.8 : 0) +
-    (copyList.length ? 11 + copyList.length * 4.8 : 0)
-
-  // The tail may sit lower than body text: it is the end of the letter, and
-  // the page number is not until 285.
-  if (ctx.y + tailHeight > 278) newPage(ctx, ref)
+  if (!tailFits(ctx.y, letter)) newPage(ctx, ref)
   ctx.y += 4
   doc.setFont('times', 'normal')
   doc.setFontSize(11.5)
