@@ -13,7 +13,7 @@ import {
   friendlyError,
   useToast,
 } from '../components/ui'
-import { APP_NAME } from '../../core/constants'
+import { APP_NAME, APP_VERSION, APP_BUILD } from '../../core/constants'
 import { SETTING_KEYS } from '../../core/constants'
 import {
   activeProject,
@@ -926,22 +926,30 @@ export function LoginScreen() {
           {busy ? 'Checking…' : 'Sign in'}
         </button>
 
-        {requestEndpoint ? (
-          <>
-            <div style={{ height: 10 }} />
-            <button
-              className="btn block secondary"
-              type="button"
-              onClick={() => setRequesting(true)}
-            >
-              I do not have an account yet
-            </button>
-            <p className="hint" style={{ marginBottom: 0 }}>
-              Ask the administrator for one. They decide what you may see before any account
-              exists.
-            </p>
-          </>
-        ) : null}
+        <div style={{ height: 10 }} />
+        <button
+          className="btn block secondary"
+          type="button"
+          onClick={() => setRequesting(true)}
+          disabled={!requestEndpoint}
+        >
+          I do not have an account yet
+        </button>
+        <p className="hint" style={{ marginBottom: 0 }}>
+          {requestEndpoint
+            ? 'Ask the administrator for one. They decide what you may see before any account exists.'
+            : 'This device is not connected to the cloud, so a request could not reach anyone. Ask the administrator directly.'}
+        </p>
+
+        {/*
+          Which build this copy is running. Invisible until something is
+          wrong, and then the first thing worth knowing: a browser serving an
+          older cached copy looks identical to a current one, and without
+          this there is no way to tell them apart.
+        */}
+        <p className="hint" style={{ textAlign: 'center', marginBottom: 0, opacity: 0.7 }}>
+          Version {APP_VERSION} · build {APP_BUILD}
+        </p>
       </form>
     </div>
   )
