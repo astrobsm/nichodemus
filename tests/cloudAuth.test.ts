@@ -356,7 +356,7 @@ describe('an outreach that has not been set up yet', () => {
     // rather than the one the rest of this file seeded.
     vi.resetModules()
     process.env.TURSO_DATABASE_URL = url
-    emptyAuth = (await import('../api/auth?empty')).webHandler
+    emptyAuth = (await import('../api/auth')).webHandler
   })
 
   afterAll(() => {
