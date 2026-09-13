@@ -216,16 +216,23 @@ export async function renderLetter(
   // --- the signature block, which is never orphaned --------------------
   // A closing and a name alone on a fresh page look like an afterthought,
   // and on an official letter they raise the question of what was on the
-  // page before. 46mm keeps the close, the space to sign, and the name
-  // together with at least something of the body.
-  ensure(ctx, 46, ref)
+  // page before. This is exactly what the block needs - close, room to sign,
+  // rule, name and title - and no more: reserving more than that pushes the
+  // block onto a page of its own in the very cases where it would have fitted,
+  // which is the problem it exists to avoid.
+  ensure(ctx, 34, ref)
   ctx.y += 4
   doc.setFont('times', 'normal')
   doc.setFontSize(11.5)
+  // Set explicitly rather than inherited: a letter that broke to a second
+  // page has just drawn the grey continuation header, and the closing and
+  // the signatory's name would print in that grey - which on a letter to a
+  // Ministry reads as a printing fault.
+  doc.setTextColor(20, 20, 20)
   doc.text(letter.closing, MARGIN, ctx.y)
 
   // Room to actually sign, then a rule to sign above.
-  ctx.y += 22
+  ctx.y += 18
   doc.setDrawColor(120, 120, 120)
   doc.setLineWidth(0.3)
   doc.line(MARGIN, ctx.y, MARGIN + 62, ctx.y)
@@ -233,6 +240,7 @@ export async function renderLetter(
 
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(10.5)
+  doc.setTextColor(20, 20, 20)
   doc.text(letter.signatoryName || '[name]', MARGIN, ctx.y)
   ctx.y += 5
   if (letter.signatoryTitle) {
