@@ -1813,14 +1813,20 @@ function AboutSettings() {
       </Card>
 
       <Card title="What this version does">
-        <KeyValue k="Clinical photography" v={<Badge tone="ok">Built</Badge>} />
         <KeyValue k="Synchronisation between devices" v={<Badge tone="ok">Built</Badge>} />
+        <KeyValue k="Clinical photography" v={<Badge tone="ok">Built</Badge>} />
         <KeyValue k="Off-site backup" v={<Badge tone="ok">Built</Badge>} />
+        <KeyValue k="Staff request their own accounts" v={<Badge tone="ok">Built</Badge>} />
+        <KeyValue k="Sign-in details sent by WhatsApp" v={<Badge tone="ok">Built</Badge>} />
+        <KeyValue k="Official letters on the letterhead" v={<Badge tone="ok">Built</Badge>} />
+        <KeyValue k="Updates itself" v={<Badge tone="ok">Built</Badge>} />
         <p className="hint">
-          Photographs need a separate photography consent and stay on the device that took them
-          unless an administrator turns synchronisation on for them. Records are matched between
-          devices on their UUID, and the off-site backup copy is encrypted here before it is sent,
-          so the server holds ciphertext it cannot open.
+          Records are matched between devices on their UUID. Photographs need a separate
+          photography consent and stay on the device that took them unless an administrator turns
+          synchronisation on for them. The off-site backup is encrypted here before it is sent, so
+          the server holds ciphertext it cannot open. An account requested by a member of staff
+          grants nothing until an administrator approves it. Letters are written and saved as PDFs
+          on this device, and WhatsApp opens with the message ready — nothing is sent on its own.
         </p>
       </Card>
 

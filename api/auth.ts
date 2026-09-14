@@ -143,7 +143,21 @@ async function submitRequest(body: {
   if (!username || !fullName) {
     return reply({ ok: false, error: 'Enter your full name and the username you would like.' }, 400)
   }
-  if (!hash || !salt || !(iterations >= 10_000 && iterations <= 1_000_000)) {
+  // A PBKDF2-SHA256 derivation is 32 bytes and its salt 16, so base64 of them
+  // is 44 and 24 characters. Anything materially longer is not a derivation.
+  //
+  // This endpoint takes writes from anyone who can reach the address - it has
+  // to, since the person has no account yet - so an unbounded string here is
+  // a way to fill the database of a clinical system from the outside. The
+  // shape is checked, not merely the presence.
+  const plausible = (value: string, min: number, max: number) =>
+    value.length >= min && value.length <= max && /^[A-Za-z0-9+/=_-]+$/.test(value)
+
+  if (
+    !plausible(hash, 40, 90) ||
+    !plausible(salt, 16, 64) ||
+    !(iterations >= 10_000 && iterations <= 1_000_000)
+  ) {
     return reply({ ok: false, error: 'The PIN was not prepared correctly on this device.' }, 400)
   }
 
@@ -170,7 +184,9 @@ async function submitRequest(body: {
                                         device_id)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', ?, ?)`,
     args: [
-      String(body.uuid ?? `req-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`),
+      // Also bounded: it is written by the caller and used as a primary key.
+      String(body.uuid ?? '').slice(0, 64) ||
+        `req-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
       username,
       fullName,
       body.roleRequested ? String(body.roleRequested).slice(0, 40) : null,

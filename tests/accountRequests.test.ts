@@ -129,6 +129,52 @@ describe('asking for an account', () => {
     expect(res.status).toBe(400)
   })
 
+  it('refuses a PIN derivation that is not one', async () => {
+    // The endpoint accepts writes from anyone who can reach the address, so an
+    // unbounded string here is a way to fill a clinical system's database from
+    // the outside. A real derivation is 44 characters and its salt 24.
+    const huge = 'A'.repeat(200_000)
+    const res = await post({
+      action: 'request',
+      username: 'floods',
+      fullName: 'Flooding Attempt',
+      pinRecord: { hash: huge, salt: huge, iterations: 150000 },
+    })
+    expect(res.status).toBe(400)
+
+    const stored = await client.execute({
+      sql: 'SELECT COUNT(*) AS n FROM account_requests WHERE username = ?',
+      args: ['floods'],
+    })
+    expect(Number(stored.rows[0].n)).toBe(0)
+  })
+
+  it('refuses a derivation containing something other than base64', async () => {
+    const res = await post({
+      action: 'request',
+      username: 'sneaky',
+      fullName: 'Sneaky Person',
+      pinRecord: { hash: "'; DROP TABLE users; --aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", salt: 'abcdefghijklmnop', iterations: 150000 },
+    })
+    expect(res.status).toBe(400)
+  })
+
+  it('bounds the identifier the caller chooses', async () => {
+    const pinRecord = await hashPin('4821')
+    await post({
+      action: 'request',
+      uuid: 'x'.repeat(5000),
+      username: 'longid',
+      fullName: 'Long Identifier',
+      pinRecord,
+    })
+    const row = await client.execute({
+      sql: 'SELECT uuid FROM account_requests WHERE username = ?',
+      args: ['longid'],
+    })
+    expect(String(row.rows[0]?.uuid ?? '').length).toBeLessThanOrEqual(64)
+  })
+
   it('needs a name and a username', async () => {
     const pinRecord = await hashPin('4821')
     const res = await post({ action: 'request', username: '', fullName: '', pinRecord })
